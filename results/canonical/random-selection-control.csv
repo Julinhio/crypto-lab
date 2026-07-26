@@ -1,0 +1,2 @@
+simulations,seed,plausibilityRankingTotalR,meanTotalR,p05TotalR,medianTotalR,p95TotalR,probabilityBeatingPlausibilityRanking,baselineTrades,baselineTotalR
+20000,123456789,6.85860666189987,6.35708645625999,5.8586066618998665,5.859271234915976,6.85927123491598,0.3714,30,6.85860666189987

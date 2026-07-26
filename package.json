@@ -1,0 +1,16 @@
+{
+  "name": "crypto-lab-harness",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.16.0"
+  },
+  "scripts": {
+    "download": "node src/cli.mjs download",
+    "run": "node src/cli.mjs run",
+    "verify": "node src/cli.mjs verify",
+    "clean-room": "node src/clean-room.mjs",
+    "test": "node --test"
+  }
+}

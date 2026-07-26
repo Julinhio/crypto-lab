@@ -1,0 +1,2 @@
+setupRuns,triggeredBeforeGate,gateRejected,gateRejectedNoiseOnly,gateRejectedPlausibilityOnly,gateRejectedBoth,invalidated,sameBarTriggerAndInvalidation,expired,technicalCensored,pairDeathsMarkedToZero
+723,624,580,1,578,1,80,2,17,0,0

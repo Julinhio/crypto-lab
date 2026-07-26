@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "configSha256": "f8be1dfa8f5997a2c9fd27e32944e526d3917acbaf13c8cd38e2267dd65c7a47",
+  "dataManifestSha256": "b3b9b6c13c0e683737f588f40e78a27fd6c3b32472c5bee98925669f871816ae",
+  "files": [
+    {
+      "file": "breakout-2r-candidate-outcomes.csv",
+      "bytes": 4723,
+      "sha256": "8d65f1924d66d4f15c496318d0f649e7822c89daff6790e98758fb3731e761e0"
+    },
+    {
+      "file": "breakout-2r-candidate-snapshots.csv",
+      "bytes": 15079,
+      "sha256": "fb632ab5e414652f47d6fcd38e822c516dae3263b220ede04ef70d3ac947a777"
+    },
+    {
+      "file": "breakout-2r-candidates-joined.csv",
+      "bytes": 18232,
+      "sha256": "75da0f351b538a433fae6639372cbf04d4e161a7906eae227096741c27640dbe"
+    },
+    {
+      "file": "breakout-plan-stats.csv",
+      "bytes": 234,
+      "sha256": "e84c7837e7b0f7e472852473fdeda1d4fa1860f8c33685f44afc0a05e42209cb"
+    },
+    {
+      "file": "capacity-slots.csv",
+      "bytes": 359,
+      "sha256": "b0f553bdd76702771a99e8a6a50219f29af137aba9a3a14ccc53ab6c3aa9b151"
+    },
+    {
+      "file": "corridor-by-atr-floor.csv",
+      "bytes": 3104,
+      "sha256": "0ba4984dbc70a981b7ffa71991bdf3a8671e291ec0d2f3161c0a94cbf60072cb"
+    },
+    {
+      "file": "feature-correlations.csv",
+      "bytes": 1074,
+      "sha256": "48690e72a3430bea502f53ace0db85137b4175df2715143219c8f2105ac52003"
+    },
+    {
+      "file": "feature-tertiles.csv",
+      "bytes": 4619,
+      "sha256": "c887ed7eec386d523aa045c111bdf47aa7d353df62c4ecc9ba3ca59336ecdd96"
+    },
+    {
+      "file": "oracle.csv",
+      "bytes": 82,
+      "sha256": "35b1409d6b0ee202f2c3650067831a9f17977968f99757256716c472ce475bcb"
+    },
+    {
+      "file": "random-selection-control.csv",
+      "bytes": 286,
+      "sha256": "ad9a1515a7f8ad560e7a0b1fbd50a35fa4af9002b5852e67fdb33aaa89d23a06"
+    },
+    {
+      "file": "summary.json",
+      "bytes": 1772,
+      "sha256": "b15cc50c1fbcaeab680b0cddcfd375c0e230e4007cdcbdea3e031605c78726f5"
+    },
+    {
+      "file": "target-sweep.csv",
+      "bytes": 1529,
+      "sha256": "7f5f9342d6616eded5bede5aff4d2302f20688d652428a435f4c7b4e26e8b683"
+    },
+    {
+      "file": "trailing-by-arm.csv",
+      "bytes": 3693,
+      "sha256": "4b6dfbea7c8493a710f75f8d009d9aacac7306d71d6c6160996f4881dd702812"
+    }
+  ]
+}

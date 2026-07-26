@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "asOfExclusive": "2026-07-26T15:00:00.000Z",
+  "evaluationStartInclusive": "2025-07-26T15:00:00.000Z",
+  "fetchStartInclusive": "2025-07-08T15:00:00.000Z",
+  "interval": "1h",
+  "universe": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "BNBUSDT",
+    "XRPUSDT",
+    "SOLUSDT",
+    "DOGEUSDT",
+    "ADAUSDT",
+    "TRXUSDT",
+    "LINKUSDT",
+    "AVAXUSDT",
+    "LTCUSDT",
+    "BCHUSDT",
+    "DOTUSDT",
+    "NEARUSDT",
+    "SUIUSDT"
+  ],
+  "dataPolicy": {
+    "maximumReplayCutoffLagHours": 2,
+    "terminalReasonBySymbol": {
+      "BTCUSDT": "replay-cutoff",
+      "ETHUSDT": "replay-cutoff",
+      "BNBUSDT": "replay-cutoff",
+      "XRPUSDT": "replay-cutoff",
+      "SOLUSDT": "replay-cutoff",
+      "DOGEUSDT": "replay-cutoff",
+      "ADAUSDT": "replay-cutoff",
+      "TRXUSDT": "replay-cutoff",
+      "LINKUSDT": "replay-cutoff",
+      "AVAXUSDT": "replay-cutoff",
+      "LTCUSDT": "replay-cutoff",
+      "BCHUSDT": "replay-cutoff",
+      "DOTUSDT": "replay-cutoff",
+      "NEARUSDT": "replay-cutoff",
+      "SUIUSDT": "replay-cutoff"
+    }
+  },
+  "cost": {
+    "roundTripFraction": 0.003
+  },
+  "indicators": {
+    "atrHours": 14,
+    "emaHours": 84,
+    "smaHours": 200,
+    "priorHighHours": 20,
+    "medianVolumeHours": 20,
+    "plausibilityLookbackDays": 14,
+    "plausibilityForwardHours": 24,
+    "plausibilityPercentile": 0.75,
+    "plausibilityMinimumDays": 7
+  },
+  "strategy": {
+    "pivotLeftHours": 2,
+    "pivotRightHours": 2,
+    "pivotLookbackHours": 24,
+    "pivotBufferAtr": 0.25,
+    "noiseFloorAtr": 1.5,
+    "noiseFloorAtrReference": "setup-bar-atr-percent",
+    "preBreakoutDistanceAtr": 0.5,
+    "maximumExtensionAtr": 2.5,
+    "trapTtlHours": 24,
+    "positionExpiryHours": 24,
+    "targetR": 2,
+    "maxSlots": 2,
+    "sameAssetConcurrentPositions": 1,
+    "collisionPolicy": "pessimistic",
+    "entryGapPolicy": "max-trigger-or-open",
+    "ranking": "plausibility-margin-desc-symbol-asc"
+  },
+  "measurements": {
+    "corridorEvaluationStartInclusive": "2026-06-08T15:00:00.000Z",
+    "corridorNoiseFloorsAtr": [0.5, 0.75, 1, 1.25, 1.5, 2],
+    "trailingArmR": [1.5, 2, 2.5, 3],
+    "trailingTrapTtlHours": 4,
+    "trailingCollisionPolicy": "pessimistic",
+    "targetSweepR": [1, 1.25, 1.5, 1.75, 2],
+    "targetSweepTrapTtlHours": 24,
+    "targetSweepCollisionPolicy": "high-first",
+    "capacitySlots": [2, 3, 4],
+    "randomSelection": {
+      "simulations": 20000,
+      "seed": 123456789
+    },
+    "featurePermutation": {
+      "simulations": 20000,
+      "seed": 246813579
+    },
+    "bootstrap": {
+      "simulations": 50000,
+      "seed": 975318642,
+      "blockWeeks": 4
+    }
+  }
+}

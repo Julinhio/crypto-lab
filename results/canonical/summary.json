@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "configuration": {
+    "configSha256": "f8be1dfa8f5997a2c9fd27e32944e526d3917acbaf13c8cd38e2267dd65c7a47",
+    "asOfExclusive": "2026-07-26T15:00:00.000Z",
+    "evaluationStartInclusive": "2025-07-26T15:00:00.000Z",
+    "corridorEvaluationStartInclusive": "2026-06-08T15:00:00.000Z",
+    "fetchStartInclusive": "2025-07-08T15:00:00.000Z",
+    "universe": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "BNBUSDT",
+      "XRPUSDT",
+      "SOLUSDT",
+      "DOGEUSDT",
+      "ADAUSDT",
+      "TRXUSDT",
+      "LINKUSDT",
+      "AVAXUSDT",
+      "LTCUSDT",
+      "BCHUSDT",
+      "DOTUSDT",
+      "NEARUSDT",
+      "SUIUSDT"
+    ],
+    "roundTripCostFraction": 0.003,
+    "randomSelection": {
+      "simulations": 20000,
+      "seed": 123456789
+    },
+    "featurePermutation": {
+      "simulations": 20000,
+      "seed": 246813579
+    },
+    "bootstrap": {
+      "simulations": 50000,
+      "seed": 975318642,
+      "blockWeeks": 4
+    }
+  },
+  "dataManifestSha256": "b3b9b6c13c0e683737f588f40e78a27fd6c3b32472c5bee98925669f871816ae",
+  "keyResults": {
+    "breakoutCandidateCount": 44,
+    "breakoutExecutable": {
+      "trades": 30,
+      "rejectedForCapacityOrDuplicateAsset": 14,
+      "totalR": 6.85860666189987,
+      "meanR": 0.228620222063329,
+      "negativeTrades": 16,
+      "maximumLossStreak": 4
+    },
+    "randomSelection": {
+      "simulations": 20000,
+      "seed": 123456789,
+      "plausibilityRankingTotalR": 6.85860666189987,
+      "meanTotalR": 6.35708645625999,
+      "p05TotalR": 5.8586066618998665,
+      "medianTotalR": 5.859271234915976,
+      "p95TotalR": 6.85927123491598,
+      "probabilityBeatingPlausibilityRanking": 0.3714
+    },
+    "oracleTotalR": 24.57830666058294,
+    "rawPositiveOnlyTotalR": 35.55812664370024
+  }
+}

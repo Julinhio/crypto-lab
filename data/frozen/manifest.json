@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "source": "https://data-api.binance.vision",
+  "interval": "1h",
+  "asOfExclusive": "2026-07-26T15:00:00.000Z",
+  "fetchStartInclusive": "2025-07-08T15:00:00.000Z",
+  "configSha256": "f8be1dfa8f5997a2c9fd27e32944e526d3917acbaf13c8cd38e2267dd65c7a47",
+  "files": [
+    {
+      "symbol": "BTCUSDT",
+      "file": "raw/BTCUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "96246d6448b5795144d7b5123657e8af4c29a5c8709291ff0c4ff7efb5e1d8de"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "file": "raw/ETHUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "de881d21aaddf4fb2247c48905db0b2054d98337d4aaf71becb91a748c17adcb"
+    },
+    {
+      "symbol": "BNBUSDT",
+      "file": "raw/BNBUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "9772cd3239388da37bf8b48b2eae1082dbb20291409cfdd5b7408bdf160e67e2"
+    },
+    {
+      "symbol": "XRPUSDT",
+      "file": "raw/XRPUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "4c7224e5a6cb6d013535412b9dc1b38af83f8ee35c679ae072a2c544517835a1"
+    },
+    {
+      "symbol": "SOLUSDT",
+      "file": "raw/SOLUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "4cbfd3708cee9a4c91f4cb59b037f3456a824715b376f0d940eec16f095bdc0b"
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "file": "raw/DOGEUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "3b1d88aaf67d2579f678a2ca38d583bbebc41b8e851c359992b56055fb649928"
+    },
+    {
+      "symbol": "ADAUSDT",
+      "file": "raw/ADAUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "3a7a90f7d0a368e8589fa20fc965192d68a0e875e2cb4d808c2744031785180b"
+    },
+    {
+      "symbol": "TRXUSDT",
+      "file": "raw/TRXUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "4fe8ca9ce3a950efc739e410d11d1cfeb956a8d317e4e4dbe128d6e23452223e"
+    },
+    {
+      "symbol": "LINKUSDT",
+      "file": "raw/LINKUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "233889f11295523de1c2c56dc500117cbe1fdd48102d82985dfd6f1e4346b8ed"
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "file": "raw/AVAXUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "0192e3cb7dc4226559e3c9a10245ad30e0e3671d13f1bdd85503a057f740784d"
+    },
+    {
+      "symbol": "LTCUSDT",
+      "file": "raw/LTCUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "a7e470ab0aaf86b6f2f8358b8e267bb76b8ce4ee9e613619d596b6128a25ee84"
+    },
+    {
+      "symbol": "BCHUSDT",
+      "file": "raw/BCHUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "5dee660244e0907c218bc0e6821ea97b49bad109d7167ed8ba32cd8faa510462"
+    },
+    {
+      "symbol": "DOTUSDT",
+      "file": "raw/DOTUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "6b6e09dbeea18406b0eb95868be33853c4b91abaf5efc9cb53f8df9960e8f97e"
+    },
+    {
+      "symbol": "NEARUSDT",
+      "file": "raw/NEARUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "582d868127597d990ecb8267b62f6ae9b3428f000401cb4eb264316ac23f4de4"
+    },
+    {
+      "symbol": "SUIUSDT",
+      "file": "raw/SUIUSDT-1h.json",
+      "rows": 9192,
+      "firstOpenTime": 1751986800000,
+      "lastOpenTime": 1785074400000,
+      "terminalReason": "replay-cutoff",
+      "sha256": "6d203489d5e52348e734a726386daa0682ebff441dc9f67e582a5ef53eba17c6"
+    }
+  ]
+}

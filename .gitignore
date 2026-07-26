@@ -1,0 +1,8 @@
+data/*
+!data/frozen/
+!data/frozen/**
+repro/
+results/*
+!results/canonical/
+!results/canonical/**
+node_modules/

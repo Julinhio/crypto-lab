@@ -103,6 +103,15 @@ sélectionneur.
 - `src/runner.mjs` : orchestration sans réseau ;
 - `src/cli.mjs` et `src/clean-room.mjs` : commandes reproductibles.
 
+Acquisition partagée, utilisée par le harness et par les bundles :
+
+- `src/binance-source.mjs` : source verrouillée et préflight ;
+- `src/timeframe.mjs` : pas de curseur par timeframe et règle d'admissibilité ;
+- `src/candle.mjs` : validation des charges utiles, partagée acquisition/vérification ;
+- `src/klines.mjs` : pagination et contrôles de continuité ;
+- `src/exposure-config.mjs`, `src/producer-source.mjs` et
+  `src/exposure-bundle.mjs` : production du bundle `crypto-buddy-exposure-v1`.
+
 ## Données et manifestes
 
 `data/frozen/manifest.json` donne, pour chaque paire, le nombre de lignes, la
@@ -118,3 +127,14 @@ La proposition fail-closed pour les coûts historiques par paire et par époque
 est dans `docs/COST-MODEL-PROPOSAL.md`. Elle doit être signée avant le replay de
 falsification ; le `k=0,3%` actuel ne doit pas être étendu aux anciennes
 altcoins.
+
+## Bundles pour `crypto-buddy`
+
+`data/bundles/crypto-buddy-exposure-v1/` fige les bougies `4h` et `1d` de BTC,
+ETH, BNB et XRP entre 2020 et 2026, pour que `crypto-buddy` recalibre sa bande
+d'exposition ailleurs que sur un seul mois haussier. Le contrat de consommation,
+les preuves de provenance et le trou Binance du 19 février 2020 sont documentés
+dans `docs/BUNDLE-CRYPTO-BUDDY-EXPOSURE-V1.md`.
+
+Aucune logique de régime, de transition ou de porte ne vit dans ce dépôt : elle
+reste dans `crypto-buddy`.

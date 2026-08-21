@@ -1,0 +1,9 @@
+# Every JSON payload in this repository is hashed byte for byte and compared
+# against a manifest. A checkout that rewrites line endings would break every
+# SHA-256 at once, so their newlines are pinned.
+*.json text eol=lf
+
+# The acquisition sources are hashed too, into producer_source_sha256. A
+# checkout that rewrites their line endings would make an untouched bundle fail
+# its own verification.
+*.mjs text eol=lf

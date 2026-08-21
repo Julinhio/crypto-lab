@@ -81,3 +81,14 @@ export function listFilesRecursive(root) {
 export function relativePosix(root, filePath) {
   return path.relative(root, filePath).split(path.sep).join("/");
 }
+
+// Compact canonical form: one JSON array per file, stable key order inherited
+// from the row objects, trailing newline. Consumers keep a plain JSON.parse.
+export function compactJson(value) {
+  return `${JSON.stringify(value)}\n`;
+}
+
+export function writeCompactJson(filePath, value) {
+  ensureDir(path.dirname(filePath));
+  fs.writeFileSync(filePath, compactJson(value), "utf8");
+}

@@ -485,6 +485,10 @@ const PREIMAGE_INPUT = {
   evaluationStart: "2021-01-01T00:00:00.000Z",
   asOfExclusive: "2026-08-21T00:00:00.000Z",
   producerSourceSha256: "a".repeat(64),
+  producerSourceFiles: [
+    { path: "src/candle.mjs", sha256: "1".repeat(64) },
+    { path: "src/klines.mjs", sha256: "2".repeat(64) },
+  ],
   acquisitionConfigSha256: "b".repeat(64),
   files: [
     {
@@ -546,6 +550,7 @@ test("the bundle hash moves when any covered field moves", () => {
     { evaluationStart: "2021-01-02T00:00:00.000Z" },
     { asOfExclusive: "2026-08-22T00:00:00.000Z" },
     { producerSourceSha256: "e".repeat(64) },
+    { producerSourceFiles: [{ path: "src/candle.mjs", sha256: "9".repeat(64) }] },
     { acquisitionConfigSha256: "f".repeat(64) },
     { files: [{ ...PREIMAGE_INPUT.files[0], sha256: "0".repeat(64) }] },
     {
@@ -666,6 +671,7 @@ function reseal(manifest) {
     evaluationStart: manifest.evaluation_start,
     asOfExclusive: manifest.as_of_exclusive,
     producerSourceSha256: manifest.producer_source_sha256,
+    producerSourceFiles: manifest.producer_source_files,
     acquisitionConfigSha256: manifest.acquisition_config_sha256,
     files: manifest.series,
   }));
@@ -932,6 +938,147 @@ test("the shipped series all reach the last slot before the cutoff", () => {
   });
   assert.equal(result.checks.series_reach_cutoff, true);
   assert.deepEqual(result.series_short_of_cutoff, []);
+});
+
+// --- The producer refuses to write an incomplete series -----------------------
+// A short page ends the pagination loop, so without these the build would write
+// a truncated series and still exit successfully.
+
+function pagedSource({ count, startAt = FETCH_START }) {
+  return async (url) => {
+    const parsed = new URL(url);
+    if (parsed.pathname.endsWith("/ping")) return { ok: true, status: 200 };
+    const step = parsed.searchParams.get("interval") === "1d" ? DAY : 4 * HOUR;
+    if (Number(parsed.searchParams.get("startTime")) > startAt) {
+      return { ok: true, json: async () => [] };
+    }
+    const page = Array.from({ length: count }, (_, index) => {
+      const open = startAt + index * step;
+      return [open, "100", "110", "90", "105", "1", open + step - 1, "1", "1", "1", "1"];
+    });
+    return { ok: true, json: async () => page };
+  };
+}
+
+test("a build stops rather than write a series truncated at the end", async () => {
+  const dir = temporaryDir("exposure-buildshort-");
+  const config = loadExposureConfig("config/crypto-buddy-exposure-v1.json");
+  await assert.rejects(
+    () => buildExposureBundle({
+      config,
+      bundleDir: dir,
+      repoRoot: process.cwd(),
+      fetchImpl: pagedSource({ count: 10 }),
+    }),
+    /does not cover the window/,
+  );
+  assert.equal(
+    fs.existsSync(path.join(dir, "manifest.json")),
+    false,
+    "no manifest may be written for an incomplete bundle",
+  );
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("a build stops rather than shift a series that starts late", async () => {
+  const dir = temporaryDir("exposure-buildlate-");
+  const config = loadExposureConfig("config/crypto-buddy-exposure-v1.json");
+  await assert.rejects(
+    () => buildExposureBundle({
+      config,
+      bundleDir: dir,
+      repoRoot: process.cwd(),
+      fetchImpl: pagedSource({ count: 10, startAt: FETCH_START + 30 * DAY }),
+    }),
+    /is not `?padded or shifted|starts at/,
+  );
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// --- The verifier refuses to conclude without its reference -------------------
+
+test("verification without a configuration refuses to conclude", () => {
+  assert.throws(
+    () => verifyExposureBundle({ bundleDir: BUNDLE_DIR, repoRoot: process.cwd() }),
+    /requires configPath/,
+    "vacuously true checks would be worse than no answer",
+  );
+});
+
+// --- The verifier diagnoses a damaged artifact instead of crashing ------------
+
+test("a file truncated into invalid JSON is reported, not thrown", () => {
+  const result = verifyTampered("exposure-corrupt-", (manifest, dir) => {
+    const series = manifest.series[0];
+    const filePath = path.join(dir, series.file);
+    const bytes = fs.readFileSync(filePath).subarray(0, 500);
+    fs.writeFileSync(filePath, bytes);
+    series.sha256 = createHash("sha256").update(bytes).digest("hex");
+  });
+  assert.equal(result.checks.files_intact, true, "the SHA was updated to match");
+  assert.equal(result.checks.controls_recomputed, false);
+  assert.equal(result.ok, false);
+  assert.equal(
+    result.recomputed_control_mismatches[0].mismatches[0].label,
+    "unparsable_file",
+  );
+});
+
+test("a file parsing as a non-array is reported, not thrown", () => {
+  const result = verifyTampered("exposure-notarray-", (manifest, dir) => {
+    const series = manifest.series[0];
+    const filePath = path.join(dir, series.file);
+    fs.writeFileSync(filePath, '{"not":"an array"}\n', "utf8");
+    series.sha256 = createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+  });
+  assert.equal(result.checks.controls_recomputed, false);
+  assert.equal(result.ok, false);
+  assert.equal(
+    result.recomputed_control_mismatches[0].mismatches[0].label,
+    "not_an_array",
+  );
+});
+
+test("a missing data file is reported, not thrown", () => {
+  const result = verifyTampered("exposure-missingfile-", (manifest, dir) => {
+    fs.rmSync(path.join(dir, manifest.series[0].file));
+  });
+  assert.equal(result.checks.files_intact, false);
+  assert.equal(result.checks.controls_recomputed, false);
+  assert.equal(result.ok, false);
+});
+
+// --- Detailed provenance is compared, not merely displayed --------------------
+
+test("an edited producer_source_files entry is refused", () => {
+  const result = verifyTampered("exposure-provenance-", (manifest) => {
+    manifest.producer_source_files[0].sha256 = "0".repeat(64);
+  });
+  assert.equal(
+    result.checks.bundle_sha256_consistent,
+    true,
+    "the forgery is resealed over the edited array",
+  );
+  assert.equal(result.checks.producer_source_unchanged, false);
+  assert.equal(result.ok, false);
+  assert.equal(result.producer_source_file_mismatches.length, 1);
+});
+
+test("a producer_source_files entry removed from the manifest is refused", () => {
+  const result = verifyTampered("exposure-provenance-drop-", (manifest) => {
+    manifest.producer_source_files.pop();
+  });
+  assert.equal(result.checks.producer_source_unchanged, false);
+  assert.equal(result.ok, false);
+});
+
+test("the shipped manifest declares exactly the sources on disk", () => {
+  const result = verifyExposureBundle({
+    bundleDir: BUNDLE_DIR,
+    repoRoot: process.cwd(),
+    configPath: "config/crypto-buddy-exposure-v1.json",
+  });
+  assert.deepEqual(result.producer_source_file_mismatches, []);
 });
 
 // --- Manifest schema version --------------------------------------------------

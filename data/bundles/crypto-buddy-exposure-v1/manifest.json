@@ -7,7 +7,7 @@
   "evaluation_start": "2021-01-01T00:00:00.000Z",
   "as_of_exclusive": "2026-08-21T00:00:00.000Z",
   "acquisition_config_sha256": "0b025d7d332abbabc2dc84da2afeab1d3ae4b2f46c2ae23a8548261313825f7a",
-  "producer_source_sha256": "2dbbf4e63877c5d93fbdded6535dccd5546d233a815454bc7dc26d98cca23541",
+  "producer_source_sha256": "b517acc2aa4f088199cd04612e68b9a9d8b22e5313990d441fb85bda3eba7e84",
   "producer_source_files": [
     {
       "path": "src/binance-source.mjs",
@@ -19,7 +19,7 @@
     },
     {
       "path": "src/exposure-bundle.mjs",
-      "sha256": "6281d5220c22b44a3b0c039884e7e327c67a973b4615e3dc050c0e8bac639645"
+      "sha256": "1edc385dfddce79732965c96c68bb48e9b267bcbe8f7d20ea13cde70aa6cd18a"
     },
     {
       "path": "src/exposure-config.mjs",
@@ -39,10 +39,10 @@
     },
     {
       "path": "src/timeframe.mjs",
-      "sha256": "3cc0329b9f21a0399985e0f18178ff3b320e89456ef0ab369c47f57d8ae66052"
+      "sha256": "69a16a7484ce5c05fb43e38b1532e78f6431b3baa153282e0db0b7da73b4c1a9"
     }
   ],
-  "generation_git_commit": "f1e7ba8b1b8c0a377c647bc540f0ec6a7f2e81b5",
+  "generation_git_commit": "6df9a43207f741717ab1cad451a5509b5434e4c1",
   "generation_git_commit_authority": "informative only, never a proof of provenance. The bundle is committed together with the manifest and the branch is squash-merged, so this commit does not exist at generation time and changes again on merge. Use producer_source_sha256.",
   "series": [
     {
@@ -206,5 +206,5 @@
       "sha256": "a8f020d4928b37f0feb5c5d6d3a02d4b541b3a5efbec36a3a4d5fa912ab88f45"
     }
   ],
-  "bundle_sha256": "eb3fe14dc7d74f4f9898435c75d83fba7b4390cb6e19e914c2a8bb7b23c606f9"
+  "bundle_sha256": "517563c6a9ec9a29eba769049b7154a2a2a2b9c5ce6fd8730dfc019f17e487ce"
 }

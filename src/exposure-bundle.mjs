@@ -14,7 +14,12 @@ import {
 import { BINANCE_DATA_API, preflight } from "./binance-source.mjs";
 import { downloadKlines, inspectSeries } from "./klines.mjs";
 import { candleProblems } from "./candle.mjs";
-import { isAdmissibleCandle, timeframeMs } from "./timeframe.mjs";
+import {
+  firstSlotAtOrAfter,
+  isAdmissibleCandle,
+  lastSlotBefore,
+  timeframeMs,
+} from "./timeframe.mjs";
 import { loadExposureConfig } from "./exposure-config.mjs";
 import { collectProducerSources, producerSourceSha256 } from "./producer-source.mjs";
 
@@ -46,6 +51,7 @@ export function bundlePreimage({
   evaluationStart,
   asOfExclusive,
   producerSourceSha256: producerHash,
+  producerSourceFiles = [],
   acquisitionConfigSha256,
   files,
 }) {
@@ -56,6 +62,10 @@ export function bundlePreimage({
     evaluation_start: evaluationStart,
     as_of_exclusive: asOfExclusive,
     producer_source_sha256: producerHash,
+    // Published as the detailed provenance proof, so authenticated as one.
+    producer_source_files: [...producerSourceFiles]
+      .map(({ path: filePath, sha256 }) => ({ path: filePath, sha256 }))
+      .sort((left, right) => (left.path < right.path ? -1 : 1)),
     acquisition_config_sha256: acquisitionConfigSha256,
     files: [...files]
       .map((item) => ({
@@ -116,6 +126,25 @@ export async function buildExposureBundle({
       if (!rows.length) {
         throw new Error(`${symbol} ${timeframe} returned no admissible candle`);
       }
+      // A short page ends the pagination loop, so an upstream hiccup would
+      // otherwise write a truncated series and report a successful build. The
+      // producer applies the same completeness rule as the verifier, before
+      // anything is written: a run that cannot cover the window stops here.
+      const expectedFirst = firstSlotAtOrAfter(config.fetchStartMs, timeframe);
+      const expectedLast = lastSlotBefore(config.asOfExclusiveMs, timeframe);
+      if (rows[0].t !== expectedFirst) {
+        throw new Error(
+          `${symbol} ${timeframe} starts at ${isoOrNull(rows[0].t)}, expected `
+          + `${isoOrNull(expectedFirst)}. History starting after fetch_start is not `
+          + `padded or shifted: report the real first candle and stop.`,
+        );
+      }
+      if (rows.at(-1).t !== expectedLast) {
+        throw new Error(
+          `${symbol} ${timeframe} ends at ${isoOrNull(rows.at(-1).t)}, expected `
+          + `${isoOrNull(expectedLast)}. The series does not cover the window.`,
+        );
+      }
       const controls = inspectSeries(rows, timeframeMs(timeframe));
       // The written series is keyed by open time, so a duplicate surviving to
       // this point would mean the writer itself is broken.
@@ -163,6 +192,7 @@ export async function buildExposureBundle({
     evaluationStart: config.evaluationStartInclusive,
     asOfExclusive: config.asOfExclusive,
     producerSourceSha256: producerHash,
+    producerSourceFiles,
     acquisitionConfigSha256: config.configSha256,
     files: series,
   });
@@ -194,17 +224,23 @@ export function verifyExposureBundle({
   repoRoot = process.cwd(),
   configPath = null,
 }) {
+  // The configuration is the reference the config-dependent checks are judged
+  // against. Without it they could only be vacuously true, and a verifier must
+  // not report a green check it had no reference to evaluate.
+  if (!configPath) {
+    throw new Error(
+      "verifyExposureBundle requires configPath: without the acquisition "
+      + "configuration, the completeness and metadata checks have no reference "
+      + "and cannot be reported as passing.",
+    );
+  }
   const manifestPath = path.resolve(bundleDir, "manifest.json");
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  const config = configPath ? loadExposureConfig(configPath) : null;
-  // Admissibility is re-judged against the configuration when there is one, so
-  // that a bundle cannot move its own cutoff to legitimise the rows it carries.
-  const fetchStartMs = config
-    ? config.fetchStartMs
-    : Date.parse(manifest.fetch_start);
-  const asOfExclusiveMs = config
-    ? config.asOfExclusiveMs
-    : Date.parse(manifest.as_of_exclusive);
+  const config = loadExposureConfig(configPath);
+  // Admissibility is re-judged against the configuration, so that a bundle
+  // cannot move its own cutoff to legitimise the rows it carries.
+  const fetchStartMs = config.fetchStartMs;
+  const asOfExclusiveMs = config.asOfExclusiveMs;
 
   const fileChecks = manifest.series.map((item) => {
     const filePath = path.resolve(bundleDir, item.file);
@@ -223,9 +259,32 @@ export function verifyExposureBundle({
   const controlChecks = manifest.series.map((item) => {
     const filePath = path.resolve(bundleDir, item.file);
     if (!fs.existsSync(filePath)) {
-      return { file: item.file, ok: false, reason: "missing file" };
+      return {
+        file: item.file,
+        ok: false,
+        mismatches: [{ label: "missing_file", expected: item.file, actual: null }],
+      };
     }
-    const rows = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    // A damaged artifact is exactly what this tool exists to diagnose, so a
+    // truncated or non-array file is reported as a failed check rather than
+    // thrown as an uncaught error that would leave the caller with no result.
+    let rows;
+    try {
+      rows = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    } catch (error) {
+      return {
+        file: item.file,
+        ok: false,
+        mismatches: [{ label: "unparsable_file", expected: "valid JSON", actual: error.message }],
+      };
+    }
+    if (!Array.isArray(rows)) {
+      return {
+        file: item.file,
+        ok: false,
+        mismatches: [{ label: "not_an_array", expected: "array", actual: typeof rows }],
+      };
+    }
     const recomputed = inspectSeries(rows, timeframeMs(item.timeframe));
     const mismatches = [];
     // The admissibility rule is the bundle's defining discipline. Re-apply it
@@ -299,6 +358,7 @@ export function verifyExposureBundle({
     evaluationStart: manifest.evaluation_start,
     asOfExclusive: manifest.as_of_exclusive,
     producerSourceSha256: manifest.producer_source_sha256,
+    producerSourceFiles: manifest.producer_source_files ?? [],
     acquisitionConfigSha256: manifest.acquisition_config_sha256,
     files: manifest.series,
   });
@@ -309,25 +369,32 @@ export function verifyExposureBundle({
     repoRoot,
   );
   const currentProducerSha256 = producerSourceSha256(currentProducerFiles);
+  const declaredProducerFiles = manifest.producer_source_files ?? [];
+  const producerFileMismatches = (() => {
+    const declared = new Map(declaredProducerFiles.map((item) => [item.path, item.sha256]));
+    const current = new Map(currentProducerFiles.map((item) => [item.path, item.sha256]));
+    const paths = [...new Set([...declared.keys(), ...current.keys()])].sort();
+    return paths
+      .filter((filePath) => declared.get(filePath) !== current.get(filePath))
+      .map((filePath) => ({
+        path: filePath,
+        declared: declared.get(filePath) ?? null,
+        current: current.get(filePath) ?? null,
+      }));
+  })();
 
-  const configSha256 = config ? config.configSha256 : null;
+  const configSha256 = config.configSha256;
 
   // Hash consistency alone cannot tell a complete bundle from a truncated one:
   // drop a series and its file, recompute bundle_sha256 over what remains, and
   // every other check still passes. The series set is therefore compared against
   // the configured universe x timeframes.
   const present = manifest.series.map((item) => `${item.symbol}-${item.timeframe}`);
-  const expected = config
-    ? config.universe
-      .flatMap((symbol) => config.timeframes.map((tf) => `${symbol}-${tf}`))
-      .sort()
-    : null;
-  const missingSeries = expected
-    ? expected.filter((key) => !present.includes(key))
-    : [];
-  const unexpectedSeries = expected
-    ? present.filter((key) => !expected.includes(key))
-    : [];
+  const expected = config.universe
+    .flatMap((symbol) => config.timeframes.map((tf) => `${symbol}-${tf}`))
+    .sort();
+  const missingSeries = expected.filter((key) => !present.includes(key));
+  const unexpectedSeries = present.filter((key) => !expected.includes(key));
   const duplicatedSeries = [
     ...new Set(present.filter((key, index) => present.indexOf(key) !== index)),
   ];
@@ -342,10 +409,7 @@ export function verifyExposureBundle({
   // would need a declared terminal reason, not a silently shorter series.
   const shortSeries = manifest.series
     .map((item) => {
-      const step = timeframeMs(item.timeframe);
-      const expected = isoOrNull(
-        Math.floor((asOfExclusiveMs - step) / step) * step,
-      );
+      const expected = isoOrNull(lastSlotBefore(asOfExclusiveMs, item.timeframe));
       return { series: `${item.symbol}-${item.timeframe}`, expected, actual: item.last_open_time };
     })
     .filter((item) => item.actual !== item.expected);
@@ -359,8 +423,7 @@ export function verifyExposureBundle({
   // silently shifted.
   const lateSeries = manifest.series
     .map((item) => {
-      const step = timeframeMs(item.timeframe);
-      const expected = isoOrNull(Math.ceil(fetchStartMs / step) * step);
+      const expected = isoOrNull(firstSlotAtOrAfter(fetchStartMs, item.timeframe));
       return { series: `${item.symbol}-${item.timeframe}`, expected, actual: item.first_open_time };
     })
     .filter((item) => item.actual !== item.expected);
@@ -369,7 +432,7 @@ export function verifyExposureBundle({
   // about whether the manifest still agrees with it, so the config-derived
   // fields are compared one by one.
   const metadataMismatches = [];
-  if (config) {
+  {
     const expectedMetadata = {
       bundle_id: config.bundleId,
       source: config.source,
@@ -390,10 +453,13 @@ export function verifyExposureBundle({
     schema_version_supported: manifest.schema_version === SCHEMA_VERSION,
     files_intact: fileChecks.every((item) => item.ok),
     bundle_sha256_consistent: recomputedBundleSha256 === manifest.bundle_sha256,
+    // The aggregate hash and the per-file array must both agree with the
+    // sources on disk. The array is published as the detailed provenance proof,
+    // so it is compared rather than merely displayed.
     producer_source_unchanged:
-      currentProducerSha256 === manifest.producer_source_sha256,
-    acquisition_config_unchanged:
-      configSha256 === null || configSha256 === manifest.acquisition_config_sha256,
+      currentProducerSha256 === manifest.producer_source_sha256
+      && producerFileMismatches.length === 0,
+    acquisition_config_unchanged: configSha256 === manifest.acquisition_config_sha256,
     // Derived from the authenticated count, not from the `duplicates_ok`
     // boolean: that boolean is not in the preimage, so it can be left true
     // while the count it summarises is resealed to a non-zero value.
@@ -416,7 +482,8 @@ export function verifyExposureBundle({
     bundle_sha256: manifest.bundle_sha256,
     recomputed_bundle_sha256: recomputedBundleSha256,
     current_producer_source_sha256: currentProducerSha256,
-    series_expected: expected ? expected.length : null,
+    producer_source_file_mismatches: producerFileMismatches,
+    series_expected: expected.length,
     series_present: present.length,
     checks,
     ok: Object.values(checks).every(Boolean),

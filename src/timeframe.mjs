@@ -30,6 +30,19 @@ export function nextCursor(lastOpenTime, interval) {
   return lastOpenTime + timeframeMs(interval);
 }
 
+// The first and last slots a complete series must occupy, on the timeframe's own
+// grid. Shared by the producer, which refuses to write a series that misses
+// either end, and by the verifier, which refuses to certify one.
+export function firstSlotAtOrAfter(fetchStartMs, interval) {
+  const step = timeframeMs(interval);
+  return Math.ceil(fetchStartMs / step) * step;
+}
+
+export function lastSlotBefore(asOfExclusiveMs, interval) {
+  const step = timeframeMs(interval);
+  return Math.floor((asOfExclusiveMs - step) / step) * step;
+}
+
 // Admissibility rule, applied exactly as specified: three independent
 // conditions. The close is compared against the historical bound, never against
 // the wall clock of the run.

@@ -114,7 +114,9 @@ ordre chronologique strict, clés stables, newline final. Le consommateur fait u
 `producer_source_sha256` est le hash canonique des fichiers d'acquisition qui
 ont produit le bundle, calculé en parcourant le graphe d'imports statiques
 depuis `src/exposure-bundle.mjs`. Le détail fichier par fichier est publié dans
-`producer_source_files`.
+`producer_source_files`, qui entre dans le preimage et est comparé aux sources
+présentes sur disque : une provenance publiée comme preuve est authentifiée
+comme telle, pas seulement affichée.
 
 `generation_git_commit` est **informatif et n'est jamais une preuve
 d'autorité**. Le bundle et son manifeste entrent dans le commit qui les produit,
@@ -140,6 +142,14 @@ ferait échouer un bundle intact à sa propre vérification. Vérifié par clone
 node src/exposure-bundle.mjs verify --config config/crypto-buddy-exposure-v1.json --bundle data/bundles/crypto-buddy-exposure-v1
 ```
 
+La configuration est obligatoire. Sans elle, les contrôles qui en dépendent ne
+pourraient être que vrais par vacuité, et un vérificateur ne doit pas annoncer
+vert un contrôle dont il n'a pas la référence : l'appel échoue explicitement.
+
+Un fichier illisible ou qui ne contient pas un tableau est **rapporté** comme
+contrôle en échec, jamais levé en exception : diagnostiquer un artefact
+endommagé est précisément le métier de cet outil.
+
 Sortie `0` si tout passe, `2` sinon. Les onze contrôles sont indépendants :
 
 - `schema_version_supported` : `verify` est lui-même un consommateur du
@@ -147,7 +157,8 @@ Sortie `0` si tout passe, `2` sinon. Les onze contrôles sont indépendants :
 - `files_intact` : les huit fichiers ont le SHA-256 annoncé ;
 - `bundle_sha256_consistent` : le manifeste est cohérent avec lui-même ;
 - `producer_source_unchanged` : les sources d'acquisition actuelles hashent
-  toujours à la valeur enregistrée ;
+  toujours à la valeur enregistrée, et `producer_source_files` décrit exactement
+  ce qui est sur disque ;
 - `acquisition_config_unchanged` : la configuration n'a pas bougé ;
 - `controls_clean` : ni doublon, ni rupture d'ordre ;
 - `series_complete` : l'ensemble des séries du manifeste correspond exactement à
@@ -205,6 +216,18 @@ Chacun de ces scénarios de forge est reproduit tel quel par un test, re-scellag
 du manifeste compris.
 
 Aucun accès réseau, aucune dépendance vivante vers `crypto-buddy`.
+
+## Le producteur refuse d'écrire un bundle incomplet
+
+Une page courte termine la boucle de pagination. Sans garde-fou, un hoquet de la
+source écrirait donc une série amputée et le build sortirait en succès. Le
+producteur applique la même règle de complétude que le vérificateur, **avant**
+d'écrire quoi que ce soit : une série qui ne démarre pas au premier créneau à
+partir de `fetch_start`, ou qui n'atteint pas le dernier créneau avant
+`as_of_exclusive`, arrête le run. Aucun manifeste n'est écrit.
+
+C'est aussi la forme exécutable de la consigne sur les paires cotées tard : on
+ne comble pas, on ne décale pas, on rapporte et on rend la main.
 
 ## Régénérer
 

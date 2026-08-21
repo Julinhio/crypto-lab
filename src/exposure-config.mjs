@@ -66,7 +66,11 @@ export function loadExposureConfig(configPath) {
   if (typeof config.bundleId !== "string" || !BUNDLE_ID.test(config.bundleId)) {
     throw new Error(`bundleId must be kebab-case, got ${JSON.stringify(config.bundleId)}`);
   }
-  assertLockedSource(config.source);
+  // Canonicalised, not merely accepted. A same-origin spelling such as a
+  // trailing slash would otherwise be validated here, then compared verbatim
+  // against the canonical string the manifest carries, and the bundle would
+  // fail its own verification.
+  const lockedSource = assertLockedSource(config.source);
   requireArrayOfUnique(
     config.universe,
     "universe",
@@ -94,6 +98,7 @@ export function loadExposureConfig(configPath) {
 
   return {
     ...config,
+    source: lockedSource,
     fetchStartMs,
     evaluationStartMs,
     asOfExclusiveMs,

@@ -107,6 +107,7 @@ Acquisition partagée, utilisée par le harness et par les bundles :
 
 - `src/binance-source.mjs` : source verrouillée et préflight ;
 - `src/timeframe.mjs` : pas de curseur par timeframe et règle d'admissibilité ;
+- `src/candle.mjs` : validation des charges utiles, partagée acquisition/vérification ;
 - `src/klines.mjs` : pagination et contrôles de continuité ;
 - `src/exposure-config.mjs`, `src/producer-source.mjs` et
   `src/exposure-bundle.mjs` : production du bundle `crypto-buddy-exposure-v1`.

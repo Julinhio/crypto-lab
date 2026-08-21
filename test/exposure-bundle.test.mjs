@@ -20,10 +20,12 @@ import {
   preflight,
 } from "../src/binance-source.mjs";
 import { downloadKlines, inspectSeries } from "../src/klines.mjs";
+import { CANDLE_FIELDS, candleFromApiRow, candleProblems } from "../src/candle.mjs";
 import {
   bundlePreimage,
   buildExposureBundle,
   computeBundleSha256,
+  SCHEMA_VERSION,
   verifyExposureBundle,
 } from "../src/exposure-bundle.mjs";
 import { loadExposureConfig } from "../src/exposure-config.mjs";
@@ -150,7 +152,7 @@ test("the paginator counts what the admissibility rule discards", async () => {
 
 test("a duplicate open time returned by the source is counted, not hidden", async () => {
   let served = false;
-  const candle = [FETCH_START, 1, 2, 0, 1, 9, FETCH_START + 4 * HOUR - 1, 9, 9, 9, 9];
+  const candle = [FETCH_START, 1, 2, 1, 1, 9, FETCH_START + 4 * HOUR - 1, 9, 9, 9, 9];
   const fetchImpl = async () => {
     if (served) return { ok: true, json: async () => [] };
     served = true;
@@ -200,8 +202,8 @@ test("two different payloads for one open time stop the run", async () => {
   const fetchImpl = async () => ({
     ok: true,
     json: async () => [
-      [FETCH_START, 1, 2, 0, 1, 9, FETCH_START + 4 * HOUR - 1, 9, 9, 9, 9],
-      [FETCH_START, 1, 2, 0, 7, 9, FETCH_START + 4 * HOUR - 1, 9, 9, 9, 9],
+      [FETCH_START, 1, 2, 1, 1, 9, FETCH_START + 4 * HOUR - 1, 9, 9, 9, 9],
+      [FETCH_START, 1, 2, 1, 7, 9, FETCH_START + 4 * HOUR - 1, 9, 9, 9, 9],
     ],
   });
   await assert.rejects(
@@ -213,6 +215,115 @@ test("two different payloads for one open time stop the run", async () => {
       fetchImpl,
     }),
     /Conflicting duplicate candle/,
+  );
+});
+
+// --- Payload validation, shared by acquisition and verification ---------------
+// Number() turns a malformed field into NaN and JSON.stringify turns NaN into
+// null, so without these an invalid upstream response lands in a data file as a
+// silent null price, or as 0 when the field was null.
+
+function apiRow(overrides = {}) {
+  const row = [
+    FETCH_START, "100", "110", "90", "105", "12.5",
+    FETCH_START + 4 * HOUR - 1, "1300", "42", "6.25", "650",
+  ];
+  for (const [index, value] of Object.entries(overrides)) row[index] = value;
+  return row;
+}
+
+test("a non-numeric field is refused instead of becoming null", () => {
+  assert.equal(Number("abc"), Number.NaN || Number("abc"));
+  assert.equal(JSON.stringify(Number("abc")), "null", "this is the silent path");
+  assert.throws(() => candleFromApiRow(apiRow({ 4: "abc" })), /c is not finite/);
+});
+
+test("a null field is refused instead of becoming zero", () => {
+  assert.equal(Number(null), 0, "this is the silent path: null converts to a legal-looking zero");
+  // A null price would be caught by the strictly-positive rule anyway, but a
+  // null volume converts to 0, which is a perfectly legal volume. Both are
+  // rejected on the raw field, before any conversion can launder them.
+  assert.throws(() => candleFromApiRow(apiRow({ 1: null })), /field 1 is null/);
+  assert.throws(() => candleFromApiRow(apiRow({ 5: null })), /field 5 is null/);
+  assert.throws(() => candleFromApiRow(apiRow({ 8: null })), /field 8 is null/);
+});
+
+test("a raw field that is neither number nor numeric string is refused", () => {
+  assert.throws(() => candleFromApiRow(apiRow({ 5: undefined })), /field 5 is undefined/);
+  assert.throws(() => candleFromApiRow(apiRow({ 5: {} })), /field 5 is/);
+  assert.throws(() => candleFromApiRow(apiRow({ 5: "" })), /field 5 is empty/);
+  assert.throws(() => candleFromApiRow(apiRow({ 5: "   " })), /field 5 is empty/);
+});
+
+test("a row with fewer than eleven fields is refused", () => {
+  assert.throws(() => candleFromApiRow(apiRow().slice(0, 10)), /has 10 fields, expected at least 11/);
+  assert.throws(() => candleFromApiRow([]), /has 0 fields/);
+  assert.throws(() => candleFromApiRow(null), /is not an array/);
+});
+
+test("a missing field is refused", () => {
+  const candle = {
+    t: FETCH_START, o: 1, h: 1, l: 1, c: 1, v: 0,
+    closeTime: FETCH_START + 1, qv: 0, trades: 0, takerBuyBase: 0,
+  };
+  assert.deepEqual(candleProblems(candle), ["missing field takerBuyQuote"]);
+});
+
+test("a price at zero is refused", () => {
+  for (const index of [1, 2, 3, 4]) {
+    assert.throws(
+      () => candleFromApiRow(apiRow({ [index]: "0" })),
+      /must be strictly positive/,
+      `field index ${index}`,
+    );
+  }
+});
+
+test("a negative volume, trade count or taker volume is refused", () => {
+  for (const index of [5, 7, 8, 9, 10]) {
+    assert.throws(
+      () => candleFromApiRow(apiRow({ [index]: "-1" })),
+      /must be zero or more/,
+      `field index ${index}`,
+    );
+  }
+});
+
+test("a zero volume is accepted: an illiquid bar is a fact, not a defect", () => {
+  const candle = candleFromApiRow(apiRow({ 5: "0", 7: "0", 8: "0", 9: "0", 10: "0" }));
+  assert.equal(candle.v, 0);
+  assert.deepEqual(candleProblems(candle), []);
+});
+
+test("a close preceding its open is refused", () => {
+  assert.throws(
+    () => candleFromApiRow(apiRow({ 6: String(FETCH_START - 1) })),
+    /precedes openTime/,
+  );
+});
+
+test("a non-integer timestamp is refused", () => {
+  assert.throws(() => candleFromApiRow(apiRow({ 0: "1.5" })), /not a valid timestamp/);
+  assert.throws(() => candleFromApiRow(apiRow({ 0: "-1" })), /not a valid timestamp/);
+});
+
+test("a sound row passes and keeps the file schema", () => {
+  const candle = candleFromApiRow(apiRow());
+  assert.deepEqual(Object.keys(candle), CANDLE_FIELDS);
+  assert.deepEqual(candleProblems(candle), []);
+});
+
+test("the paginator refuses an invalid payload instead of freezing it", async () => {
+  const fetchImpl = async () => ({ ok: true, json: async () => [apiRow({ 4: "abc" })] });
+  await assert.rejects(
+    () => downloadKlines({
+      symbol: "BTCUSDT",
+      interval: "4h",
+      fetchStartMs: FETCH_START,
+      asOfExclusiveMs: AS_OF,
+      fetchImpl,
+    }),
+    /Invalid kline row for BTCUSDT 4h/,
   );
 });
 
@@ -259,6 +370,27 @@ test("no alternative source can be substituted, api.binance.com included", () =>
   assert.throws(() => assertLockedSource("http://localhost:8080"), SourceLockError);
   assert.throws(() => assertLockedSource(""), SourceLockError);
   assert.equal(assertLockedSource(BINANCE_DATA_API), BINANCE_DATA_API);
+});
+
+test("a same-origin spelling is canonicalised rather than carried through", () => {
+  const dir = temporaryDir("exposure-slash-");
+  const base = JSON.parse(
+    fs.readFileSync("config/crypto-buddy-exposure-v1.json", "utf8"),
+  );
+  for (const spelling of [
+    "https://data-api.binance.vision/",
+    "https://data-api.binance.vision",
+  ]) {
+    const configPath = path.join(dir, `${encodeURIComponent(spelling)}.json`);
+    fs.writeFileSync(configPath, JSON.stringify({ ...base, source: spelling }), "utf8");
+    const config = loadExposureConfig(configPath);
+    assert.equal(
+      config.source,
+      BINANCE_DATA_API,
+      "an accepted spelling must not produce a bundle that fails its own verification",
+    );
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test("a config declaring another source is refused at startup", () => {
@@ -668,6 +800,60 @@ test("a resealed non-zero duplicate count cannot hide behind duplicates_ok", () 
   assert.equal(result.checks.controls_recomputed, true, "the file itself is clean");
   assert.equal(result.checks.controls_clean, false, "the count is what decides");
   assert.equal(result.ok, false);
+});
+
+test("a resealed file carrying a null price is refused", () => {
+  const result = verifyTampered("exposure-nullprice-", (manifest, dir) => {
+    const series = manifest.series[0];
+    const filePath = path.join(dir, series.file);
+    const rows = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    // Exactly what Number("abc") would have produced through the old producer.
+    rows[5].c = null;
+    fs.writeFileSync(filePath, `${JSON.stringify(rows)}\n`, "utf8");
+    series.sha256 = createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+  });
+  assert.equal(result.checks.files_intact, true, "the SHA was updated to match");
+  assert.equal(result.checks.bundle_sha256_consistent, true, "and the manifest resealed");
+  assert.equal(result.checks.controls_recomputed, false);
+  assert.equal(result.ok, false);
+  const mismatch = result.recomputed_control_mismatches[0].mismatches
+    .find((item) => item.label === "invalid_rows");
+  assert.ok(mismatch, "invalid_rows must be reported");
+  assert.equal(mismatch.firstIndex, 5);
+});
+
+test("a resealed file carrying a zero price is refused", () => {
+  const result = verifyTampered("exposure-zeroprice-", (manifest, dir) => {
+    const series = manifest.series[0];
+    const filePath = path.join(dir, series.file);
+    const rows = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    rows[0].o = 0;
+    fs.writeFileSync(filePath, `${JSON.stringify(rows)}\n`, "utf8");
+    series.sha256 = createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+  });
+  assert.equal(result.checks.controls_recomputed, false);
+  assert.equal(result.ok, false);
+});
+
+// --- Manifest schema version --------------------------------------------------
+
+test("an unsupported manifest schema version is refused", () => {
+  const result = verifyTampered(
+    "exposure-schema-",
+    (manifest) => {
+      manifest.schema_version = 999;
+    },
+    { resealManifest: false },
+  );
+  assert.equal(result.checks.schema_version_supported, false);
+  assert.equal(result.ok, false);
+});
+
+test("the shipped manifest declares the supported schema version", () => {
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(BUNDLE_DIR, "manifest.json"), "utf8"),
+  );
+  assert.equal(manifest.schema_version, SCHEMA_VERSION);
 });
 
 test("a falsified first or last bound is refused because it is recomputed", () => {

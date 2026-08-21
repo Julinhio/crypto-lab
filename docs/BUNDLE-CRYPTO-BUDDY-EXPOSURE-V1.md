@@ -48,6 +48,32 @@ mécaniquement la troisième. Ce `0` est le résultat correct, pas un contrôle
 mort : la troisième condition est couverte par un test unitaire sur bougie
 synthétique, la donnée réelle ne l'exerçant jamais à ces bornes.
 
+## Validation des charges utiles
+
+`Number()` transforme un champ malformé en `NaN`, et `JSON.stringify` transforme
+`NaN` en `null`. Sans garde-fou, une réponse invalide de la source se figerait
+donc dans un fichier de données sous la forme d'un prix `null` — ou d'un `0`,
+puisque `Number(null)` vaut `0` et qu'un volume nul est parfaitement légal.
+
+`src/candle.mjs` porte la règle, partagée par les deux consommateurs :
+l'acquisition, qui convertit les lignes brutes de l'API, et la vérification, qui
+relit un bundle écrit. Une ligne est refusée si l'une de ces conditions manque :
+
+- au moins onze champs dans la ligne API ;
+- chaque champ brut est un nombre ou une chaîne non vide, avant toute
+  conversion — c'est ce qui attrape `null`, qui se convertirait sinon en zéro
+  crédible ;
+- tous les champs convertis sont finis ;
+- `openTime` et `closeTime` sont des entiers positifs ;
+- ouverture, haut, bas et clôture sont strictement positifs ;
+- volume, volume quote, nombre de transactions et volumes taker sont supérieurs
+  ou égaux à zéro ;
+- `closeTime >= openTime`.
+
+Un volume nul reste accepté : une bougie sans échange est un fait, pas un
+défaut. À l'acquisition, une ligne invalide arrête le run ; à la vérification,
+elle est comptée et rapportée sous le label `invalid_rows`.
+
 ## Contrôle des doublons
 
 `duplicate_open_times_returned_by_source` compte les ouvertures que la source a
@@ -94,7 +120,7 @@ génération et change encore au merge. Le raisonnement est circulaire, d'où
 `producer_source_sha256`, qui est stable et vérifiable après coup.
 
 `bundle_sha256` porte sur une représentation canonique et ordonnée de
-`bundle_id`, des trois bornes, de `producer_source_sha256`, de
+`bundle_id`, de `source`, des trois bornes, de `producer_source_sha256`, de
 `acquisition_config_sha256` et de la liste triée des huit fichiers avec leur
 SHA-256. Il ne porte pas sur `manifest.json`, qui le contient.
 
@@ -104,8 +130,10 @@ SHA-256. Il ne porte pas sur `manifest.json`, qui le contient.
 node src/exposure-bundle.mjs verify --config config/crypto-buddy-exposure-v1.json --bundle data/bundles/crypto-buddy-exposure-v1
 ```
 
-Sortie `0` si tout passe, `2` sinon. Les huit contrôles sont indépendants :
+Sortie `0` si tout passe, `2` sinon. Les neuf contrôles sont indépendants :
 
+- `schema_version_supported` : `verify` est lui-même un consommateur du
+  manifeste, il refuse une version de protocole qu'il ne sait pas lire ;
 - `files_intact` : les huit fichiers ont le SHA-256 annoncé ;
 - `bundle_sha256_consistent` : le manifeste est cohérent avec lui-même ;
 - `producer_source_unchanged` : les sources d'acquisition actuelles hashent
@@ -120,8 +148,8 @@ Sortie `0` si tout passe, `2` sinon. Les huit contrôles sont indépendants :
 - `controls_recomputed` : nombre de lignes, bornes, ordre et trous sont
   **recalculés depuis les fichiers de données** et confrontés à ce que le
   manifeste annonce ; la règle d'admissibilité est réappliquée à chaque bougie,
-  et le nom de fichier doit correspondre au couple `symbol`/`timeframe` sous
-  lequel la série est classée.
+  le nom de fichier doit correspondre au couple `symbol`/`timeframe` sous lequel
+  la série est classée, et chaque bougie repasse la validation de charge utile.
 
 Les trois derniers contrôles ne sont pas redondants avec les hashes, parce que
 la cohérence de hash ne prouve que la cohérence interne, jamais l'exactitude.

@@ -1,4 +1,5 @@
 import { lockedUrl } from "./binance-source.mjs";
+import { candleFromApiRow } from "./candle.mjs";
 import { isAdmissibleCandle, nextCursor } from "./timeframe.mjs";
 
 const PAGE_LIMIT = 1000;
@@ -9,22 +10,6 @@ async function getJson(url, fetchImpl, timeoutMs) {
   });
   if (!response.ok) throw new Error(`${response.status} ${url}`);
   return response.json();
-}
-
-function toCandle(row) {
-  return {
-    t: Number(row[0]),
-    o: Number(row[1]),
-    h: Number(row[2]),
-    l: Number(row[3]),
-    c: Number(row[4]),
-    v: Number(row[5]),
-    closeTime: Number(row[6]),
-    qv: Number(row[7]),
-    trades: Number(row[8]),
-    takerBuyBase: Number(row[9]),
-    takerBuyQuote: Number(row[10]),
-  };
 }
 
 // Shared paginator for every timeframe. The cursor step comes from `interval`
@@ -56,7 +41,7 @@ export async function downloadKlines({
     requests += 1;
     if (!page.length) break;
     for (const row of page) {
-      const candle = toCandle(row);
+      const candle = candleFromApiRow(row, `${symbol} ${interval}`);
       if (
         isAdmissibleCandle(
           { openTime: candle.t, closeTime: candle.closeTime },

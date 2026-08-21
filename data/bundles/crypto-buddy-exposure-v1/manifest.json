@@ -7,23 +7,27 @@
   "evaluation_start": "2021-01-01T00:00:00.000Z",
   "as_of_exclusive": "2026-08-21T00:00:00.000Z",
   "acquisition_config_sha256": "0b025d7d332abbabc2dc84da2afeab1d3ae4b2f46c2ae23a8548261313825f7a",
-  "producer_source_sha256": "4f193d7feba85928838dad4be7b8954bd3fa26923a72c0b2bea3147e7b51b8ae",
+  "producer_source_sha256": "dcb01a53048679fc53c80331003d5bb61d9d4e6bf1b4efd877affc842a98336a",
   "producer_source_files": [
     {
       "path": "src/binance-source.mjs",
       "sha256": "f5db4082ba2823292529766e81c7308b03542455329f8cd1240e108dfac58667"
     },
     {
+      "path": "src/candle.mjs",
+      "sha256": "235b8432979ced37357143fc5e02a5c6aa3c29b0da2f3e25beb968e520a50d95"
+    },
+    {
       "path": "src/exposure-bundle.mjs",
-      "sha256": "d229fdea15fb2cc3537f1d19f579068ec47281c2bc917942db8a84b43ea25912"
+      "sha256": "086d269d26d38ff6d0caf2d71672a9cca09f8304974d02c5d7169ada4d9782ea"
     },
     {
       "path": "src/exposure-config.mjs",
-      "sha256": "394ace9d8c4f12d614799ea30a4379dce3754f7f5ea09d6ed9adc166ae039b3e"
+      "sha256": "f353d4d7df0ac525eb205cdee2b534fa5becfd8ed3f696240e9bb1ca5cd18803"
     },
     {
       "path": "src/klines.mjs",
-      "sha256": "d40e4195fab1f4a1fec238fc9b45c497a00b6c7b30dffa6d91f34bf185fe6243"
+      "sha256": "5135926bd3a2091be4166a48dd063ee407e34e46694a7485dcf72fefe3b096d4"
     },
     {
       "path": "src/lib.mjs",
@@ -38,7 +42,7 @@
       "sha256": "3cc0329b9f21a0399985e0f18178ff3b320e89456ef0ab369c47f57d8ae66052"
     }
   ],
-  "generation_git_commit": "6c0ae129d710523032eb03619a868b2e347cd52c",
+  "generation_git_commit": "333dfcada9e6e21f1b66f710e17747e64c857fe7",
   "generation_git_commit_authority": "informative only, never a proof of provenance. The bundle is committed together with the manifest and the branch is squash-merged, so this commit does not exist at generation time and changes again on merge. Use producer_source_sha256.",
   "series": [
     {
@@ -202,5 +206,5 @@
       "sha256": "a8f020d4928b37f0feb5c5d6d3a02d4b541b3a5efbec36a3a4d5fa912ab88f45"
     }
   ],
-  "bundle_sha256": "48cc02b5f3ebef1895037b94ba43df521b9510983271f98e73d4a2ce6f394abd"
+  "bundle_sha256": "62daf53769b0a1d349d823417c187be1f6b9937845743f4b93d833775e3c0672"
 }

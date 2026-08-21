@@ -13,10 +13,12 @@ import {
 } from "./lib.mjs";
 import { BINANCE_DATA_API, preflight } from "./binance-source.mjs";
 import { downloadKlines, inspectSeries } from "./klines.mjs";
+import { candleProblems } from "./candle.mjs";
 import { isAdmissibleCandle, timeframeMs } from "./timeframe.mjs";
 import { loadExposureConfig } from "./exposure-config.mjs";
 import { collectProducerSources, producerSourceSha256 } from "./producer-source.mjs";
 
+export const SCHEMA_VERSION = 1;
 export const PRODUCER_REPOSITORY = "github.com/Julinhio/crypto-lab";
 export const PRODUCER_ENTRY = "src/exposure-bundle.mjs";
 export const GIT_COMMIT_AUTHORITY =
@@ -166,7 +168,7 @@ export async function buildExposureBundle({
   });
 
   const manifest = {
-    schema_version: 1,
+    schema_version: SCHEMA_VERSION,
     bundle_id: config.bundleId,
     source: BINANCE_DATA_API,
     producer_repository: PRODUCER_REPOSITORY,
@@ -257,6 +259,23 @@ export function verifyExposureBundle({
     const compare = (label, expected, actual) => {
       if (expected !== actual) mismatches.push({ label, expected, actual });
     };
+    // Payload validation, the same rules acquisition applies. Timestamps,
+    // ordering and counts all stay coherent around a null price, so nothing
+    // above would notice one.
+    const invalidRows = [];
+    for (const [index, row] of rows.entries()) {
+      const problems = candleProblems(row);
+      if (problems.length) invalidRows.push({ index, problems });
+    }
+    if (invalidRows.length) {
+      mismatches.push({
+        label: "invalid_rows",
+        expected: 0,
+        actual: invalidRows.length,
+        firstIndex: invalidRows[0].index,
+        firstProblems: invalidRows[0].problems,
+      });
+    }
     compare("rows", item.rows, rows.length);
     compare("strictly_ordered", item.strictly_ordered, recomputed.strictlyOrdered);
     compare("gap_count", item.gap_count, recomputed.gapCount);
@@ -333,6 +352,9 @@ export function verifyExposureBundle({
   }
 
   const checks = {
+    // verify is itself a consumer of the manifest, so it must refuse a protocol
+    // version it does not know how to read rather than certify it.
+    schema_version_supported: manifest.schema_version === SCHEMA_VERSION,
     files_intact: fileChecks.every((item) => item.ok),
     bundle_sha256_consistent: recomputedBundleSha256 === manifest.bundle_sha256,
     producer_source_unchanged:

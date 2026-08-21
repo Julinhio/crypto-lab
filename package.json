@@ -11,6 +11,8 @@
     "run": "node src/cli.mjs run",
     "verify": "node src/cli.mjs verify",
     "clean-room": "node src/clean-room.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "bundle:build": "node src/exposure-bundle.mjs build",
+    "bundle:verify": "node src/exposure-bundle.mjs verify"
   }
 }

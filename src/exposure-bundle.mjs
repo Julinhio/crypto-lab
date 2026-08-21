@@ -1,0 +1,284 @@
+#!/usr/bin/env node
+import fs from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
+import {
+  canonicalJson,
+  ensureDir,
+  sha256Buffer,
+  sha256File,
+  writeCanonicalJson,
+  writeCompactJson,
+} from "./lib.mjs";
+import { BINANCE_DATA_API, preflight } from "./binance-source.mjs";
+import { downloadKlines, inspectSeries } from "./klines.mjs";
+import { timeframeMs } from "./timeframe.mjs";
+import { loadExposureConfig } from "./exposure-config.mjs";
+import { collectProducerSources, producerSourceSha256 } from "./producer-source.mjs";
+
+export const PRODUCER_REPOSITORY = "github.com/Julinhio/crypto-lab";
+export const PRODUCER_ENTRY = "src/exposure-bundle.mjs";
+export const GIT_COMMIT_AUTHORITY =
+  "informative only, never a proof of provenance. The bundle is committed together "
+  + "with the manifest and the branch is squash-merged, so this commit does not exist "
+  + "at generation time and changes again on merge. Use producer_source_sha256.";
+
+const isoOrNull = (milliseconds) =>
+  Number.isFinite(milliseconds) ? new Date(milliseconds).toISOString() : null;
+
+// The bundle hash covers the identity, the three bounds, the two source hashes
+// and the sorted file list. It deliberately does not cover manifest.json, which
+// carries it: hashing the manifest with itself inside would be circular.
+export function bundlePreimage({
+  bundleId,
+  fetchStart,
+  evaluationStart,
+  asOfExclusive,
+  producerSourceSha256: producerHash,
+  acquisitionConfigSha256,
+  files,
+}) {
+  return {
+    bundle_id: bundleId,
+    fetch_start: fetchStart,
+    evaluation_start: evaluationStart,
+    as_of_exclusive: asOfExclusive,
+    producer_source_sha256: producerHash,
+    acquisition_config_sha256: acquisitionConfigSha256,
+    files: [...files]
+      .map(({ file, sha256 }) => ({ file, sha256 }))
+      .sort((left, right) => (left.file < right.file ? -1 : 1)),
+  };
+}
+
+export function computeBundleSha256(preimage) {
+  return sha256Buffer(Buffer.from(canonicalJson(preimage), "utf8"));
+}
+
+function currentGitCommit(repoRoot) {
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) return null;
+  return result.stdout.trim() || null;
+}
+
+export async function buildExposureBundle({
+  config,
+  bundleDir,
+  repoRoot = process.cwd(),
+  fetchImpl = fetch,
+  log = () => {},
+}) {
+  // Preflight first, on the locked source only. A failure aborts the run.
+  const probe = await preflight({ fetchImpl });
+  log(`preflight ${probe.source} -> HTTP ${probe.status}`);
+
+  const rawDir = path.resolve(bundleDir, "raw");
+  ensureDir(rawDir);
+
+  const series = [];
+  for (const symbol of [...config.universe].sort()) {
+    for (const timeframe of [...config.timeframes].sort()) {
+      const { rows, discardedByAdmissibility, requests } = await downloadKlines({
+        symbol,
+        interval: timeframe,
+        fetchStartMs: config.fetchStartMs,
+        asOfExclusiveMs: config.asOfExclusiveMs,
+        fetchImpl,
+      });
+      if (!rows.length) {
+        throw new Error(`${symbol} ${timeframe} returned no admissible candle`);
+      }
+      const controls = inspectSeries(rows, timeframeMs(timeframe));
+      const fileName = `${symbol}-${timeframe}.json`;
+      const filePath = path.join(rawDir, fileName);
+      writeCompactJson(filePath, rows);
+      series.push({
+        symbol,
+        timeframe,
+        file: `raw/${fileName}`,
+        rows: rows.length,
+        first_open_time: isoOrNull(rows[0].t),
+        first_close_time: isoOrNull(rows[0].closeTime),
+        last_open_time: isoOrNull(rows.at(-1).t),
+        last_close_time: isoOrNull(rows.at(-1).closeTime),
+        duplicates: controls.duplicates,
+        duplicates_ok: controls.duplicatesOk,
+        strictly_ordered: controls.strictlyOrdered,
+        gap_count: controls.gapCount,
+        gaps: controls.gaps,
+        discarded_by_admissibility: discardedByAdmissibility,
+        sha256: sha256File(filePath),
+      });
+      log(
+        `${symbol} ${timeframe}: ${rows.length} rows, ${requests} requests, `
+        + `${controls.gapCount} gaps, ${discardedByAdmissibility} discarded`,
+      );
+    }
+  }
+
+  const producerSourceFiles = collectProducerSources(
+    path.resolve(repoRoot, PRODUCER_ENTRY),
+    repoRoot,
+  );
+  const producerHash = producerSourceSha256(producerSourceFiles);
+  const preimage = bundlePreimage({
+    bundleId: config.bundleId,
+    fetchStart: config.fetchStartInclusive,
+    evaluationStart: config.evaluationStartInclusive,
+    asOfExclusive: config.asOfExclusive,
+    producerSourceSha256: producerHash,
+    acquisitionConfigSha256: config.configSha256,
+    files: series,
+  });
+
+  const manifest = {
+    schema_version: 1,
+    bundle_id: config.bundleId,
+    source: BINANCE_DATA_API,
+    producer_repository: PRODUCER_REPOSITORY,
+    fetch_start: config.fetchStartInclusive,
+    evaluation_start: config.evaluationStartInclusive,
+    as_of_exclusive: config.asOfExclusive,
+    acquisition_config_sha256: config.configSha256,
+    producer_source_sha256: producerHash,
+    producer_source_files: producerSourceFiles,
+    generation_git_commit: currentGitCommit(repoRoot),
+    generation_git_commit_authority: GIT_COMMIT_AUTHORITY,
+    series,
+    bundle_sha256: computeBundleSha256(preimage),
+  };
+  writeCanonicalJson(path.resolve(bundleDir, "manifest.json"), manifest);
+  return manifest;
+}
+
+// Offline verification. The bundle is self-contained: nothing here touches the
+// network or the sibling repository.
+export function verifyExposureBundle({
+  bundleDir,
+  repoRoot = process.cwd(),
+  configPath = null,
+}) {
+  const manifestPath = path.resolve(bundleDir, "manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+
+  const fileChecks = manifest.series.map((item) => {
+    const filePath = path.resolve(bundleDir, item.file);
+    const actual = fs.existsSync(filePath) ? sha256File(filePath) : null;
+    return {
+      file: item.file,
+      expected: item.sha256,
+      actual,
+      ok: actual === item.sha256,
+    };
+  });
+
+  const preimage = bundlePreimage({
+    bundleId: manifest.bundle_id,
+    fetchStart: manifest.fetch_start,
+    evaluationStart: manifest.evaluation_start,
+    asOfExclusive: manifest.as_of_exclusive,
+    producerSourceSha256: manifest.producer_source_sha256,
+    acquisitionConfigSha256: manifest.acquisition_config_sha256,
+    files: manifest.series,
+  });
+  const recomputedBundleSha256 = computeBundleSha256(preimage);
+
+  const currentProducerFiles = collectProducerSources(
+    path.resolve(repoRoot, PRODUCER_ENTRY),
+    repoRoot,
+  );
+  const currentProducerSha256 = producerSourceSha256(currentProducerFiles);
+
+  const configSha256 = configPath
+    ? sha256Buffer(fs.readFileSync(path.resolve(configPath)))
+    : null;
+
+  const checks = {
+    files_intact: fileChecks.every((item) => item.ok),
+    bundle_sha256_consistent: recomputedBundleSha256 === manifest.bundle_sha256,
+    producer_source_unchanged:
+      currentProducerSha256 === manifest.producer_source_sha256,
+    acquisition_config_unchanged:
+      configSha256 === null || configSha256 === manifest.acquisition_config_sha256,
+    controls_clean: manifest.series.every(
+      (item) => item.duplicates_ok && item.strictly_ordered,
+    ),
+  };
+  return {
+    bundle_id: manifest.bundle_id,
+    bundle_sha256: manifest.bundle_sha256,
+    recomputed_bundle_sha256: recomputedBundleSha256,
+    current_producer_source_sha256: currentProducerSha256,
+    checks,
+    ok: Object.values(checks).every(Boolean),
+    mismatched_files: fileChecks.filter((item) => !item.ok),
+  };
+}
+
+function parseArguments(values) {
+  const output = { _: [] };
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index];
+    if (!value.startsWith("--")) {
+      output._.push(value);
+      continue;
+    }
+    const key = value.slice(2);
+    const next = values[index + 1];
+    if (!next || next.startsWith("--")) output[key] = true;
+    else {
+      output[key] = next;
+      index += 1;
+    }
+  }
+  return output;
+}
+
+async function main() {
+  const args = parseArguments(process.argv.slice(2));
+  const command = args._[0];
+  const configPath = typeof args.config === "string"
+    ? args.config
+    : "config/crypto-buddy-exposure-v1.json";
+  const bundleDir = typeof args.bundle === "string"
+    ? args.bundle
+    : "data/bundles/crypto-buddy-exposure-v1";
+
+  if (command === "build") {
+    const config = loadExposureConfig(configPath);
+    const manifest = await buildExposureBundle({
+      config,
+      bundleDir,
+      repoRoot: process.cwd(),
+      log: (line) => process.stderr.write(`${line}\n`),
+    });
+    process.stdout.write(canonicalJson({
+      command,
+      bundle_id: manifest.bundle_id,
+      series: manifest.series.length,
+      rows: manifest.series.reduce((sum, item) => sum + item.rows, 0),
+      bundle_sha256: manifest.bundle_sha256,
+      bundleDirectory: path.resolve(bundleDir),
+    }));
+  } else if (command === "verify") {
+    const result = verifyExposureBundle({
+      bundleDir,
+      repoRoot: process.cwd(),
+      configPath,
+    });
+    process.stdout.write(canonicalJson(result));
+    if (!result.ok) process.exitCode = 2;
+  } else {
+    throw new Error(
+      "Usage: node src/exposure-bundle.mjs build|verify [--config <path>] [--bundle <dir>]",
+    );
+  }
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  await main();
+}

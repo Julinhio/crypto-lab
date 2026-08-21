@@ -1,55 +1,22 @@
 import fs from "node:fs";
 import path from "node:path";
 import { HOUR, ensureDir, sha256File, writeCanonicalJson } from "./lib.mjs";
+import { BINANCE_DATA_API } from "./binance-source.mjs";
+import { downloadKlines } from "./klines.mjs";
 
-const API = "https://data-api.binance.vision";
-
-async function getJson(url) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-  if (!response.ok) throw new Error(`${response.status} ${url}`);
-  return response.json();
-}
+const API = BINANCE_DATA_API;
 
 export async function downloadDataset(config, dataDir) {
   const rawDir = path.resolve(dataDir, "raw");
   ensureDir(rawDir);
   const files = [];
   for (const symbol of config.universe) {
-    const rows = [];
-    let cursor = config.fetchStartMs;
-    while (cursor < config.asOfExclusiveMs) {
-      const url = new URL("/api/v3/klines", API);
-      url.searchParams.set("symbol", symbol);
-      url.searchParams.set("interval", config.interval);
-      url.searchParams.set("startTime", String(cursor));
-      url.searchParams.set("endTime", String(config.asOfExclusiveMs - 1));
-      url.searchParams.set("limit", "1000");
-      const page = await getJson(url);
-      if (!page.length) break;
-      for (const row of page) {
-        const openTime = Number(row[0]);
-        if (openTime >= config.asOfExclusiveMs) continue;
-        rows.push({
-          t: openTime,
-          o: Number(row[1]),
-          h: Number(row[2]),
-          l: Number(row[3]),
-          c: Number(row[4]),
-          v: Number(row[5]),
-          closeTime: Number(row[6]),
-          qv: Number(row[7]),
-          trades: Number(row[8]),
-          takerBuyBase: Number(row[9]),
-          takerBuyQuote: Number(row[10]),
-        });
-      }
-      const next = Number(page.at(-1)[0]) + HOUR;
-      if (next <= cursor) throw new Error(`Non-advancing cursor for ${symbol}`);
-      cursor = next;
-      if (page.length < 1000) break;
-    }
-    const deduplicated = [...new Map(rows.map((row) => [row.t, row])).values()]
-      .sort((left, right) => left.t - right.t);
+    const { rows: deduplicated } = await downloadKlines({
+      symbol,
+      interval: config.interval,
+      fetchStartMs: config.fetchStartMs,
+      asOfExclusiveMs: config.asOfExclusiveMs,
+    });
     const fileName = `${symbol}-${config.interval}.json`;
     const filePath = path.join(rawDir, fileName);
     writeCanonicalJson(filePath, deduplicated);

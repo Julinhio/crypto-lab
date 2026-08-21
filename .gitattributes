@@ -1,0 +1,4 @@
+# Every JSON payload in this repository is hashed byte for byte and compared
+# against a manifest. A checkout that rewrites line endings would break every
+# SHA-256 at once, so their newlines are pinned.
+*.json text eol=lf

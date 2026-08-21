@@ -127,13 +127,20 @@ génération et change encore au merge. Le raisonnement est circulaire, d'où
 `acquisition_config_sha256` et de la liste triée des huit fichiers avec leur
 SHA-256. Il ne porte pas sur `manifest.json`, qui le contient.
 
+## Fins de ligne
+
+Les JSON et les `.mjs` sont épinglés en LF par `.gitattributes`. Les deux sont
+hashés octet par octet — les JSON dans les manifestes, les `.mjs` dans
+`producer_source_sha256` — et un checkout qui réécrirait leurs fins de ligne
+ferait échouer un bundle intact à sa propre vérification. Vérifié par clone frais.
+
 ## Vérifier le bundle, hors ligne
 
 ```bash
 node src/exposure-bundle.mjs verify --config config/crypto-buddy-exposure-v1.json --bundle data/bundles/crypto-buddy-exposure-v1
 ```
 
-Sortie `0` si tout passe, `2` sinon. Les dix contrôles sont indépendants :
+Sortie `0` si tout passe, `2` sinon. Les onze contrôles sont indépendants :
 
 - `schema_version_supported` : `verify` est lui-même un consommateur du
   manifeste, il refuse une version de protocole qu'il ne sait pas lire ;
@@ -148,6 +155,8 @@ Sortie `0` si tout passe, `2` sinon. Les dix contrôles sont indépendants :
   sans doublon ;
 - `metadata_matches_config` : `bundle_id`, `source` et les trois bornes du
   manifeste sont comparés champ par champ à la configuration ;
+- `series_start_at_fetch_start` : chaque série démarre au premier créneau de son
+  timeframe à partir de `fetch_start` ;
 - `series_reach_cutoff` : chaque série atteint le dernier créneau de son
   timeframe avant `as_of_exclusive` ;
 - `controls_recomputed` : nombre de lignes, bornes, ordre et trous sont
@@ -181,7 +190,12 @@ la cohérence de hash ne prouve que la cohérence interne, jamais l'exactitude.
   bundle auquel il manque des mois de fenêtre d'évaluation. La règle suppose que
   chaque paire cote encore à la coupure, ce qui est vrai de cet univers ; une
   paire délistée échouerait ici, et c'est délibéré — elle demanderait une raison
-  terminale déclarée, pas une série silencieusement plus courte.
+  terminale déclarée, pas une série silencieusement plus courte. La même règle
+  vaut à l'autre bout : amputer un préfixe laisse une série continue et
+  admissible qui a pourtant perdu l'amorce SMA200, voire des années après
+  `evaluation_start`. `series_start_at_fetch_start` est la forme exécutable de la
+  consigne « si une paire démarre plus tard, ne comble pas, ne décale pas
+  silencieusement le début, rends la main ».
 - `symbol` et `timeframe` font partie du preimage et le nom de fichier est
   vérifié contre eux. Sans cela, échanger deux symboles entre deux entrées du
   même timeframe passait tous les autres contrôles et faisait lire des bougies

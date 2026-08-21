@@ -889,6 +889,41 @@ test("a series truncated at the end is refused even fully resealed", () => {
   assert.equal(result.series_short_of_cutoff[0].expected, "2026-08-20T00:00:00.000Z");
 });
 
+test("a series truncated at the start is refused even fully resealed", () => {
+  const result = verifyTampered("exposure-head-", (manifest, dir) => {
+    const series = manifest.series.find((item) => item.timeframe === "1d");
+    const filePath = path.join(dir, series.file);
+    const rows = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const kept = rows.slice(200);
+    fs.writeFileSync(filePath, `${JSON.stringify(kept)}\n`, "utf8");
+    series.sha256 = createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+    series.rows = kept.length;
+    series.first_open_time = new Date(kept[0].t).toISOString();
+    series.first_close_time = new Date(kept[0].closeTime).toISOString();
+  });
+  assert.equal(result.checks.files_intact, true, "the SHA matches the truncated file");
+  assert.equal(result.checks.controls_recomputed, true, "the manifest describes it faithfully");
+  assert.equal(result.checks.series_reach_cutoff, true, "the end is untouched");
+  assert.equal(
+    result.checks.series_start_at_fetch_start,
+    false,
+    "starting at fetch_start is what catches it",
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.series_starting_late.length, 1);
+  assert.equal(result.series_starting_late[0].expected, "2020-01-01T00:00:00.000Z");
+});
+
+test("the shipped series all start at fetch_start", () => {
+  const result = verifyExposureBundle({
+    bundleDir: BUNDLE_DIR,
+    repoRoot: process.cwd(),
+    configPath: "config/crypto-buddy-exposure-v1.json",
+  });
+  assert.equal(result.checks.series_start_at_fetch_start, true);
+  assert.deepEqual(result.series_starting_late, []);
+});
+
 test("the shipped series all reach the last slot before the cutoff", () => {
   const result = verifyExposureBundle({
     bundleDir: BUNDLE_DIR,

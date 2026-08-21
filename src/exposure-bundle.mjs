@@ -350,6 +350,21 @@ export function verifyExposureBundle({
     })
     .filter((item) => item.actual !== item.expected);
 
+  // The same rule at the other end. Trimming a prefix and readjusting the first
+  // timestamps leaves a series that is still continuous and admissible, but that
+  // may have lost the SMA200 warm-up, or years of the evaluation window.
+  //
+  // This is the executable form of the mandate: a pair whose history starts
+  // after fetch_start must stop the run and be reported, never be padded or
+  // silently shifted.
+  const lateSeries = manifest.series
+    .map((item) => {
+      const step = timeframeMs(item.timeframe);
+      const expected = isoOrNull(Math.ceil(fetchStartMs / step) * step);
+      return { series: `${item.symbol}-${item.timeframe}`, expected, actual: item.first_open_time };
+    })
+    .filter((item) => item.actual !== item.expected);
+
   // The config hash proves the config file did not change. It says nothing
   // about whether the manifest still agrees with it, so the config-derived
   // fields are compared one by one.
@@ -392,6 +407,7 @@ export function verifyExposureBundle({
       && unexpectedSeries.length === 0
       && duplicatedSeries.length === 0,
     metadata_matches_config: metadataMismatches.length === 0,
+    series_start_at_fetch_start: lateSeries.length === 0,
     series_reach_cutoff: shortSeries.length === 0,
     controls_recomputed: controlChecks.every((item) => item.ok),
   };
@@ -409,6 +425,7 @@ export function verifyExposureBundle({
     unexpected_series: unexpectedSeries,
     duplicated_series: duplicatedSeries,
     metadata_mismatches: metadataMismatches,
+    series_starting_late: lateSeries,
     series_short_of_cutoff: shortSeries,
     recomputed_control_mismatches: controlChecks.filter((item) => !item.ok),
   };

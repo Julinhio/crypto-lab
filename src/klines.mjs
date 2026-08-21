@@ -39,6 +39,9 @@ export async function downloadKlines({
 }) {
   const kept = new Map();
   const discarded = new Set();
+  // Duplicates are counted here, on what the source actually returned. Counting
+  // them after the Map has collapsed them would make the control a tautology.
+  let repeatedOpenTimes = 0;
   let cursor = fetchStartMs;
   let requests = 0;
   while (cursor < asOfExclusiveMs) {
@@ -61,6 +64,20 @@ export async function downloadKlines({
           asOfExclusiveMs,
         )
       ) {
+        const previous = kept.get(candle.t);
+        if (previous !== undefined) {
+          repeatedOpenTimes += 1;
+          // Two different payloads for the same open time is a fact we cannot
+          // resolve deterministically. Last-write-wins would silently pick one,
+          // so the run stops instead.
+          if (JSON.stringify(previous) !== JSON.stringify(candle)) {
+            throw new Error(
+              `Conflicting duplicate candle for ${symbol} ${interval} at `
+              + `${new Date(candle.t).toISOString()}: `
+              + `${JSON.stringify(previous)} vs ${JSON.stringify(candle)}`,
+            );
+          }
+        }
         kept.set(candle.t, candle);
       } else {
         discarded.add(candle.t);
@@ -74,10 +91,19 @@ export async function downloadKlines({
     if (page.length < PAGE_LIMIT) break;
   }
   const rows = [...kept.values()].sort((left, right) => left.t - right.t);
-  return { rows, discardedByAdmissibility: discarded.size, requests };
+  return {
+    rows,
+    discardedByAdmissibility: discarded.size,
+    repeatedOpenTimes,
+    requests,
+  };
 }
 
-// Continuity controls, reported and never repaired. A gap is a missing bar
+// Continuity controls on a series already keyed by open time, reported and
+// never repaired. Its `duplicates` field is a structural invariant on the
+// written file, not the source-level duplicate count: that one is measured at
+// ingestion by downloadKlines, before deduplication can hide it.
+// A gap is a missing bar
 // between two consecutive kept bars, expressed on the timeframe's own grid.
 export function inspectSeries(rows, intervalMilliseconds) {
   const seen = new Set();

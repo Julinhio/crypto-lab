@@ -137,6 +137,79 @@ test("the paginator counts what the admissibility rule discards", async () => {
   assert.equal(result.discardedByAdmissibility, 1);
 });
 
+// --- Duplicates, measured at ingestion ----------------------------------------
+// Deduplication happens on the way in, so counting duplicates on the resulting
+// series would always answer zero. These lock the count to what the source
+// actually returned.
+
+test("a duplicate open time returned by the source is counted, not hidden", async () => {
+  let served = false;
+  const candle = [FETCH_START, 1, 2, 0, 1, 9, FETCH_START + 4 * HOUR - 1, 9, 9, 9, 9];
+  const fetchImpl = async () => {
+    if (served) return { ok: true, json: async () => [] };
+    served = true;
+    return { ok: true, json: async () => [candle, candle] };
+  };
+  const result = await downloadKlines({
+    symbol: "BTCUSDT",
+    interval: "4h",
+    fetchStartMs: FETCH_START,
+    asOfExclusiveMs: AS_OF,
+    fetchImpl,
+  });
+  assert.equal(result.rows.length, 1, "the written series stays deduplicated");
+  assert.equal(
+    result.repeatedOpenTimes,
+    1,
+    "deduplicating before counting would report zero here",
+  );
+  assert.equal(inspectSeries(result.rows, 4 * HOUR).duplicates, 0);
+});
+
+test("a clean series reports no duplicate at ingestion", async () => {
+  const fetchImpl = async () => ({
+    ok: true,
+    json: async () => [
+      [FETCH_START, 1, 1, 1, 1, 1, FETCH_START + 4 * HOUR - 1, 1, 1, 1, 1],
+      [
+        FETCH_START + 4 * HOUR,
+        1, 1, 1, 1, 1,
+        FETCH_START + 8 * HOUR - 1,
+        1, 1, 1, 1,
+      ],
+    ],
+  });
+  const result = await downloadKlines({
+    symbol: "BTCUSDT",
+    interval: "4h",
+    fetchStartMs: FETCH_START,
+    asOfExclusiveMs: AS_OF,
+    fetchImpl,
+  });
+  assert.equal(result.repeatedOpenTimes, 0);
+  assert.equal(result.rows.length, 2);
+});
+
+test("two different payloads for one open time stop the run", async () => {
+  const fetchImpl = async () => ({
+    ok: true,
+    json: async () => [
+      [FETCH_START, 1, 2, 0, 1, 9, FETCH_START + 4 * HOUR - 1, 9, 9, 9, 9],
+      [FETCH_START, 1, 2, 0, 7, 9, FETCH_START + 4 * HOUR - 1, 9, 9, 9, 9],
+    ],
+  });
+  await assert.rejects(
+    () => downloadKlines({
+      symbol: "BTCUSDT",
+      interval: "4h",
+      fetchStartMs: FETCH_START,
+      asOfExclusiveMs: AS_OF,
+      fetchImpl,
+    }),
+    /Conflicting duplicate candle/,
+  );
+});
+
 // --- Preflight and source lock ------------------------------------------------
 
 test("a failing preflight aborts the run before any download", async () => {

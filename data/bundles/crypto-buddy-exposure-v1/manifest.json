@@ -7,7 +7,7 @@
   "evaluation_start": "2021-01-01T00:00:00.000Z",
   "as_of_exclusive": "2026-08-21T00:00:00.000Z",
   "acquisition_config_sha256": "0b025d7d332abbabc2dc84da2afeab1d3ae4b2f46c2ae23a8548261313825f7a",
-  "producer_source_sha256": "e675b70779f5cef73c923810cf71f06e6ceaf14650e333668c8ad47c969af1ab",
+  "producer_source_sha256": "80c55f4c698f8a2931d69709bec20378ce0a8d23e4830d009a7c2c0fbc6c4b27",
   "producer_source_files": [
     {
       "path": "src/binance-source.mjs",
@@ -15,7 +15,7 @@
     },
     {
       "path": "src/exposure-bundle.mjs",
-      "sha256": "3e050a05c38abedd91bfdde22d44c8555aacf17285a47ddd50424566b654e1ec"
+      "sha256": "57fcabf752e17a6295e0a06c412a5121455df54e13e2375a858f2ae562f2577e"
     },
     {
       "path": "src/exposure-config.mjs",
@@ -23,7 +23,7 @@
     },
     {
       "path": "src/klines.mjs",
-      "sha256": "c1322875693830dbb096564f3a26f6b3223fc32ee0bfbbf2ced6c4cf9bd06730"
+      "sha256": "d40e4195fab1f4a1fec238fc9b45c497a00b6c7b30dffa6d91f34bf185fe6243"
     },
     {
       "path": "src/lib.mjs",
@@ -38,7 +38,7 @@
       "sha256": "3cc0329b9f21a0399985e0f18178ff3b320e89456ef0ab369c47f57d8ae66052"
     }
   ],
-  "generation_git_commit": "e07af6486894e74b9395befa0c4590f44298c93b",
+  "generation_git_commit": "5b09d665e6bfe01bf219fd84a504a9c9a31ee20d",
   "generation_git_commit_authority": "informative only, never a proof of provenance. The bundle is committed together with the manifest and the branch is squash-merged, so this commit does not exist at generation time and changes again on merge. Use producer_source_sha256.",
   "series": [
     {
@@ -50,7 +50,7 @@
       "first_close_time": "2020-01-01T23:59:59.999Z",
       "last_open_time": "2026-08-20T00:00:00.000Z",
       "last_close_time": "2026-08-20T23:59:59.999Z",
-      "duplicates": 0,
+      "duplicate_open_times_returned_by_source": 0,
       "duplicates_ok": true,
       "strictly_ordered": true,
       "gap_count": 0,
@@ -67,7 +67,7 @@
       "first_close_time": "2020-01-01T03:59:59.999Z",
       "last_open_time": "2026-08-20T20:00:00.000Z",
       "last_close_time": "2026-08-20T23:59:59.999Z",
-      "duplicates": 0,
+      "duplicate_open_times_returned_by_source": 0,
       "duplicates_ok": true,
       "strictly_ordered": true,
       "gap_count": 1,
@@ -90,7 +90,7 @@
       "first_close_time": "2020-01-01T23:59:59.999Z",
       "last_open_time": "2026-08-20T00:00:00.000Z",
       "last_close_time": "2026-08-20T23:59:59.999Z",
-      "duplicates": 0,
+      "duplicate_open_times_returned_by_source": 0,
       "duplicates_ok": true,
       "strictly_ordered": true,
       "gap_count": 0,
@@ -107,7 +107,7 @@
       "first_close_time": "2020-01-01T03:59:59.999Z",
       "last_open_time": "2026-08-20T20:00:00.000Z",
       "last_close_time": "2026-08-20T23:59:59.999Z",
-      "duplicates": 0,
+      "duplicate_open_times_returned_by_source": 0,
       "duplicates_ok": true,
       "strictly_ordered": true,
       "gap_count": 1,
@@ -130,7 +130,7 @@
       "first_close_time": "2020-01-01T23:59:59.999Z",
       "last_open_time": "2026-08-20T00:00:00.000Z",
       "last_close_time": "2026-08-20T23:59:59.999Z",
-      "duplicates": 0,
+      "duplicate_open_times_returned_by_source": 0,
       "duplicates_ok": true,
       "strictly_ordered": true,
       "gap_count": 0,
@@ -147,7 +147,7 @@
       "first_close_time": "2020-01-01T03:59:59.999Z",
       "last_open_time": "2026-08-20T20:00:00.000Z",
       "last_close_time": "2026-08-20T23:59:59.999Z",
-      "duplicates": 0,
+      "duplicate_open_times_returned_by_source": 0,
       "duplicates_ok": true,
       "strictly_ordered": true,
       "gap_count": 1,
@@ -170,7 +170,7 @@
       "first_close_time": "2020-01-01T23:59:59.999Z",
       "last_open_time": "2026-08-20T00:00:00.000Z",
       "last_close_time": "2026-08-20T23:59:59.999Z",
-      "duplicates": 0,
+      "duplicate_open_times_returned_by_source": 0,
       "duplicates_ok": true,
       "strictly_ordered": true,
       "gap_count": 0,
@@ -187,7 +187,7 @@
       "first_close_time": "2020-01-01T03:59:59.999Z",
       "last_open_time": "2026-08-20T20:00:00.000Z",
       "last_close_time": "2026-08-20T23:59:59.999Z",
-      "duplicates": 0,
+      "duplicate_open_times_returned_by_source": 0,
       "duplicates_ok": true,
       "strictly_ordered": true,
       "gap_count": 1,
@@ -202,5 +202,5 @@
       "sha256": "a8f020d4928b37f0feb5c5d6d3a02d4b541b3a5efbec36a3a4d5fa912ab88f45"
     }
   ],
-  "bundle_sha256": "e62f8c5b138af5ed055aa9e68d95112b74f3b983deca25832d1fa397eddc222e"
+  "bundle_sha256": "7f00be577665c65f2670738081621a87e47daed9d7f070c1ad2cff989d28578f"
 }

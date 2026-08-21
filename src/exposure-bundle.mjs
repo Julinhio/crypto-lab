@@ -82,7 +82,12 @@ export async function buildExposureBundle({
   const series = [];
   for (const symbol of [...config.universe].sort()) {
     for (const timeframe of [...config.timeframes].sort()) {
-      const { rows, discardedByAdmissibility, requests } = await downloadKlines({
+      const {
+        rows,
+        discardedByAdmissibility,
+        repeatedOpenTimes,
+        requests,
+      } = await downloadKlines({
         symbol,
         interval: timeframe,
         fetchStartMs: config.fetchStartMs,
@@ -93,6 +98,13 @@ export async function buildExposureBundle({
         throw new Error(`${symbol} ${timeframe} returned no admissible candle`);
       }
       const controls = inspectSeries(rows, timeframeMs(timeframe));
+      // The written series is keyed by open time, so a duplicate surviving to
+      // this point would mean the writer itself is broken.
+      if (controls.duplicates !== 0) {
+        throw new Error(
+          `${symbol} ${timeframe}: duplicate open time in the written series`,
+        );
+      }
       const fileName = `${symbol}-${timeframe}.json`;
       const filePath = path.join(rawDir, fileName);
       writeCompactJson(filePath, rows);
@@ -105,8 +117,8 @@ export async function buildExposureBundle({
         first_close_time: isoOrNull(rows[0].closeTime),
         last_open_time: isoOrNull(rows.at(-1).t),
         last_close_time: isoOrNull(rows.at(-1).closeTime),
-        duplicates: controls.duplicates,
-        duplicates_ok: controls.duplicatesOk,
+        duplicate_open_times_returned_by_source: repeatedOpenTimes,
+        duplicates_ok: repeatedOpenTimes === 0,
         strictly_ordered: controls.strictlyOrdered,
         gap_count: controls.gapCount,
         gaps: controls.gaps,

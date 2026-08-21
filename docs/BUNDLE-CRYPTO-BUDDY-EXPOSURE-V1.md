@@ -48,6 +48,16 @@ mécaniquement la troisième. Ce `0` est le résultat correct, pas un contrôle
 mort : la troisième condition est couverte par un test unitaire sur bougie
 synthétique, la donnée réelle ne l'exerçant jamais à ces bornes.
 
+## Contrôle des doublons
+
+`duplicate_open_times_returned_by_source` compte les ouvertures que la source a
+renvoyées plus d'une fois, mesurées **à l'ingestion**. C'est délibéré : la série
+écrite est indexée par `openTime`, donc compter les doublons après coup
+répondrait toujours `0` et publierait une tautologie plutôt qu'un contrôle.
+
+Deux charges utiles différentes pour une même ouverture ne sont pas
+arbitrables : le run s'arrête au lieu de laisser le dernier arrivé l'emporter.
+
 ## Contenu
 
 ```

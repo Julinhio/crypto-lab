@@ -27,11 +27,19 @@ export const GIT_COMMIT_AUTHORITY =
 const isoOrNull = (milliseconds) =>
   Number.isFinite(milliseconds) ? new Date(milliseconds).toISOString() : null;
 
-// The bundle hash covers the identity, the three bounds, the two source hashes
-// and the sorted file list. It deliberately does not cover manifest.json, which
-// carries it: hashing the manifest with itself inside would be circular.
+// The bundle hash covers the identity, the source, the three bounds, the two
+// source hashes and the sorted file list. It deliberately does not cover
+// manifest.json, which carries it: hashing the manifest with itself inside
+// would be circular.
+//
+// Per file it also covers the two acquisition facts that cannot be recovered
+// from the data afterwards: how many open times the source repeated, and how
+// many candles the admissibility rule discarded. Everything else a series entry
+// claims is recomputable from the file itself and is re-derived at verify time
+// rather than trusted.
 export function bundlePreimage({
   bundleId,
+  source,
   fetchStart,
   evaluationStart,
   asOfExclusive,
@@ -41,13 +49,20 @@ export function bundlePreimage({
 }) {
   return {
     bundle_id: bundleId,
+    source,
     fetch_start: fetchStart,
     evaluation_start: evaluationStart,
     as_of_exclusive: asOfExclusive,
     producer_source_sha256: producerHash,
     acquisition_config_sha256: acquisitionConfigSha256,
     files: [...files]
-      .map(({ file, sha256 }) => ({ file, sha256 }))
+      .map((item) => ({
+        file: item.file,
+        sha256: item.sha256,
+        duplicate_open_times_returned_by_source:
+          item.duplicate_open_times_returned_by_source,
+        discarded_by_admissibility: item.discarded_by_admissibility,
+      }))
       .sort((left, right) => (left.file < right.file ? -1 : 1)),
   };
 }
@@ -139,6 +154,7 @@ export async function buildExposureBundle({
   const producerHash = producerSourceSha256(producerSourceFiles);
   const preimage = bundlePreimage({
     bundleId: config.bundleId,
+    source: BINANCE_DATA_API,
     fetchStart: config.fetchStartInclusive,
     evaluationStart: config.evaluationStartInclusive,
     asOfExclusive: config.asOfExclusive,
@@ -188,8 +204,39 @@ export function verifyExposureBundle({
     };
   });
 
+  // Anything a series entry claims that the data can answer for itself is
+  // recomputed from the file, never read from the manifest. A hand-edited
+  // `strictly_ordered: true` must not be able to certify a broken series.
+  const controlChecks = manifest.series.map((item) => {
+    const filePath = path.resolve(bundleDir, item.file);
+    if (!fs.existsSync(filePath)) {
+      return { file: item.file, ok: false, reason: "missing file" };
+    }
+    const rows = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const recomputed = inspectSeries(rows, timeframeMs(item.timeframe));
+    const mismatches = [];
+    const compare = (label, expected, actual) => {
+      if (expected !== actual) mismatches.push({ label, expected, actual });
+    };
+    compare("rows", item.rows, rows.length);
+    compare("strictly_ordered", item.strictly_ordered, recomputed.strictlyOrdered);
+    compare("gap_count", item.gap_count, recomputed.gapCount);
+    compare("duplicates_in_file", 0, recomputed.duplicates);
+    compare("first_open_time", item.first_open_time, isoOrNull(rows[0]?.t));
+    compare("first_close_time", item.first_close_time, isoOrNull(rows[0]?.closeTime));
+    compare("last_open_time", item.last_open_time, isoOrNull(rows.at(-1)?.t));
+    compare("last_close_time", item.last_close_time, isoOrNull(rows.at(-1)?.closeTime));
+    compare(
+      "gaps",
+      JSON.stringify(item.gaps),
+      JSON.stringify(recomputed.gaps),
+    );
+    return { file: item.file, ok: mismatches.length === 0, mismatches };
+  });
+
   const preimage = bundlePreimage({
     bundleId: manifest.bundle_id,
+    source: manifest.source,
     fetchStart: manifest.fetch_start,
     evaluationStart: manifest.evaluation_start,
     asOfExclusive: manifest.as_of_exclusive,
@@ -228,6 +275,25 @@ export function verifyExposureBundle({
     ...new Set(present.filter((key, index) => present.indexOf(key) !== index)),
   ];
 
+  // The config hash proves the config file did not change. It says nothing
+  // about whether the manifest still agrees with it, so the config-derived
+  // fields are compared one by one.
+  const metadataMismatches = [];
+  if (config) {
+    const expectedMetadata = {
+      bundle_id: config.bundleId,
+      source: config.source,
+      fetch_start: config.fetchStartInclusive,
+      evaluation_start: config.evaluationStartInclusive,
+      as_of_exclusive: config.asOfExclusive,
+    };
+    for (const [field, expected] of Object.entries(expectedMetadata)) {
+      if (manifest[field] !== expected) {
+        metadataMismatches.push({ field, expected, actual: manifest[field] ?? null });
+      }
+    }
+  }
+
   const checks = {
     files_intact: fileChecks.every((item) => item.ok),
     bundle_sha256_consistent: recomputedBundleSha256 === manifest.bundle_sha256,
@@ -242,6 +308,8 @@ export function verifyExposureBundle({
       missingSeries.length === 0
       && unexpectedSeries.length === 0
       && duplicatedSeries.length === 0,
+    metadata_matches_config: metadataMismatches.length === 0,
+    controls_recomputed: controlChecks.every((item) => item.ok),
   };
   return {
     bundle_id: manifest.bundle_id,
@@ -256,6 +324,8 @@ export function verifyExposureBundle({
     missing_series: missingSeries,
     unexpected_series: unexpectedSeries,
     duplicated_series: duplicatedSeries,
+    metadata_mismatches: metadataMismatches,
+    recomputed_control_mismatches: controlChecks.filter((item) => !item.ok),
   };
 }
 

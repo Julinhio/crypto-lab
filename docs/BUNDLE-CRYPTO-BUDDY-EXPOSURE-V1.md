@@ -104,7 +104,7 @@ SHA-256. Il ne porte pas sur `manifest.json`, qui le contient.
 node src/exposure-bundle.mjs verify --config config/crypto-buddy-exposure-v1.json --bundle data/bundles/crypto-buddy-exposure-v1
 ```
 
-Sortie `0` si tout passe, `2` sinon. Les six contrôles sont indépendants :
+Sortie `0` si tout passe, `2` sinon. Les huit contrôles sont indépendants :
 
 - `files_intact` : les huit fichiers ont le SHA-256 annoncé ;
 - `bundle_sha256_consistent` : le manifeste est cohérent avec lui-même ;
@@ -114,13 +114,29 @@ Sortie `0` si tout passe, `2` sinon. Les six contrôles sont indépendants :
 - `controls_clean` : ni doublon, ni rupture d'ordre ;
 - `series_complete` : l'ensemble des séries du manifeste correspond exactement à
   `universe × timeframes` de la configuration, sans manquante, sans intruse,
-  sans doublon.
+  sans doublon ;
+- `metadata_matches_config` : `bundle_id`, `source` et les trois bornes du
+  manifeste sont comparés champ par champ à la configuration ;
+- `controls_recomputed` : nombre de lignes, bornes, ordre et trous sont
+  **recalculés depuis les fichiers de données** et confrontés à ce que le
+  manifeste annonce.
 
-Le dernier contrôle n'est pas redondant avec les hashes. Retirer une série et
-son fichier, puis recalculer `bundle_sha256` sur ce qui reste, produit un
-manifeste parfaitement cohérent avec lui-même : la cohérence de hash seule ne
-distingue pas un bundle complet d'un bundle tronqué. Seule la comparaison à la
-configuration le fait. Un test reproduit exactement ce scénario.
+Les trois derniers contrôles ne sont pas redondants avec les hashes, parce que
+la cohérence de hash ne prouve que la cohérence interne, jamais l'exactitude.
+
+- Retirer une série et son fichier puis recalculer `bundle_sha256` sur ce qui
+  reste produit un manifeste parfaitement cohérent avec lui-même. Seule la
+  comparaison à la configuration distingue un bundle complet d'un bundle
+  tronqué.
+- Le hash de la configuration prouve que le fichier de configuration n'a pas
+  changé ; il ne dit rien sur le fait que le manifeste soit toujours d'accord
+  avec lui. Un manifeste re-scellé peut annoncer une autre fenêtre d'évaluation
+  ou une autre identité, et `source` peut même être modifié sans re-sceller
+  quoi que ce soit.
+- Une valeur comme `strictly_ordered` ou `gap_count` est une affirmation sur la
+  donnée : elle est recalculée, jamais crue sur parole.
+
+Chacun de ces scénarios de forge est reproduit tel quel par un test.
 
 Aucun accès réseau, aucune dépendance vivante vers `crypto-buddy`.
 

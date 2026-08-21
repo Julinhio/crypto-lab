@@ -317,14 +317,25 @@ test("a clean series reports no gap", () => {
 
 const PREIMAGE_INPUT = {
   bundleId: "crypto-buddy-exposure-v1",
+  source: BINANCE_DATA_API,
   fetchStart: "2020-01-01T00:00:00.000Z",
   evaluationStart: "2021-01-01T00:00:00.000Z",
   asOfExclusive: "2026-08-21T00:00:00.000Z",
   producerSourceSha256: "a".repeat(64),
   acquisitionConfigSha256: "b".repeat(64),
   files: [
-    { file: "raw/BTCUSDT-4h.json", sha256: "c".repeat(64) },
-    { file: "raw/ETHUSDT-1d.json", sha256: "d".repeat(64) },
+    {
+      file: "raw/BTCUSDT-4h.json",
+      sha256: "c".repeat(64),
+      duplicate_open_times_returned_by_source: 0,
+      discarded_by_admissibility: 0,
+    },
+    {
+      file: "raw/ETHUSDT-1d.json",
+      sha256: "d".repeat(64),
+      duplicate_open_times_returned_by_source: 0,
+      discarded_by_admissibility: 0,
+    },
   ],
 };
 
@@ -349,19 +360,32 @@ test("the bundle hash ignores fields the manifest carries but the preimage does 
     computeBundleSha256(withNoise),
     computeBundleSha256(bundlePreimage(PREIMAGE_INPUT)),
   );
-  assert.deepEqual(Object.keys(withNoise.files[0]).sort(), ["file", "sha256"]);
+  assert.deepEqual(Object.keys(withNoise.files[0]).sort(), [
+    "discarded_by_admissibility",
+    "duplicate_open_times_returned_by_source",
+    "file",
+    "sha256",
+  ]);
 });
 
 test("the bundle hash moves when any covered field moves", () => {
   const baseline = computeBundleSha256(bundlePreimage(PREIMAGE_INPUT));
   const mutations = [
     { bundleId: "other-bundle" },
+    { source: "https://example.invalid" },
     { fetchStart: "2020-01-02T00:00:00.000Z" },
     { evaluationStart: "2021-01-02T00:00:00.000Z" },
     { asOfExclusive: "2026-08-22T00:00:00.000Z" },
     { producerSourceSha256: "e".repeat(64) },
     { acquisitionConfigSha256: "f".repeat(64) },
-    { files: [{ file: "raw/BTCUSDT-4h.json", sha256: "0".repeat(64) }] },
+    { files: [{ ...PREIMAGE_INPUT.files[0], sha256: "0".repeat(64) }] },
+    {
+      files: [{
+        ...PREIMAGE_INPUT.files[0],
+        duplicate_open_times_returned_by_source: 3,
+      }],
+    },
+    { files: [{ ...PREIMAGE_INPUT.files[0], discarded_by_admissibility: 7 }] },
   ];
   for (const mutation of mutations) {
     assert.notEqual(
@@ -409,15 +433,7 @@ test("a truncated bundle is refused even once its hashes are made consistent", (
   fs.rmSync(path.join(dir, dropped.file));
   // Re-seal the manifest over what remains: hash consistency alone must not be
   // enough to certify an incomplete bundle.
-  manifest.bundle_sha256 = computeBundleSha256(bundlePreimage({
-    bundleId: manifest.bundle_id,
-    fetchStart: manifest.fetch_start,
-    evaluationStart: manifest.evaluation_start,
-    asOfExclusive: manifest.as_of_exclusive,
-    producerSourceSha256: manifest.producer_source_sha256,
-    acquisitionConfigSha256: manifest.acquisition_config_sha256,
-    files: manifest.series,
-  }));
+  reseal(manifest);
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
   const result = verifyExposureBundle({
@@ -469,6 +485,110 @@ test("a bundle listing the same series twice is refused", () => {
   assert.equal(result.ok, false);
   assert.equal(result.duplicated_series.length, 1);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+function reseal(manifest) {
+  manifest.bundle_sha256 = computeBundleSha256(bundlePreimage({
+    bundleId: manifest.bundle_id,
+    source: manifest.source,
+    fetchStart: manifest.fetch_start,
+    evaluationStart: manifest.evaluation_start,
+    asOfExclusive: manifest.as_of_exclusive,
+    producerSourceSha256: manifest.producer_source_sha256,
+    acquisitionConfigSha256: manifest.acquisition_config_sha256,
+    files: manifest.series,
+  }));
+  return manifest;
+}
+
+function verifyTampered(prefix, mutate, { resealManifest = true } = {}) {
+  const dir = copyBundle(prefix);
+  const manifestPath = path.join(dir, "manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  mutate(manifest, dir);
+  if (resealManifest) reseal(manifest);
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  const result = verifyExposureBundle({
+    bundleDir: dir,
+    repoRoot: process.cwd(),
+    configPath: "config/crypto-buddy-exposure-v1.json",
+  });
+  fs.rmSync(dir, { recursive: true, force: true });
+  return result;
+}
+
+test("a resealed manifest declaring another evaluation window is refused", () => {
+  const result = verifyTampered("exposure-window-", (manifest) => {
+    manifest.evaluation_start = "2024-01-01T00:00:00.000Z";
+  });
+  assert.equal(result.checks.bundle_sha256_consistent, true, "the forgery is resealed");
+  assert.equal(result.checks.acquisition_config_unchanged, true);
+  assert.equal(result.checks.metadata_matches_config, false);
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.metadata_mismatches.map((item) => item.field), [
+    "evaluation_start",
+  ]);
+});
+
+test("a resealed manifest declaring another identity or bound is refused", () => {
+  for (const [field, value] of [
+    ["bundle_id", "some-other-bundle"],
+    ["fetch_start", "2019-01-01T00:00:00.000Z"],
+    ["as_of_exclusive", "2026-09-01T00:00:00.000Z"],
+  ]) {
+    const result = verifyTampered(`exposure-meta-${field}-`, (manifest) => {
+      manifest[field] = value;
+    });
+    assert.equal(result.checks.metadata_matches_config, false, field);
+    assert.equal(result.ok, false, field);
+  }
+});
+
+test("a manifest claiming another source is refused without even being resealed", () => {
+  const result = verifyTampered(
+    "exposure-source-",
+    (manifest) => {
+      manifest.source = "https://api.binance.com";
+    },
+    { resealManifest: false },
+  );
+  assert.equal(result.checks.metadata_matches_config, false);
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.metadata_mismatches.map((item) => item.field), ["source"]);
+});
+
+test("edited continuity controls are refused because they are recomputed", () => {
+  const result = verifyTampered("exposure-controls-", (manifest) => {
+    const series = manifest.series.find((item) => item.timeframe === "4h");
+    assert.equal(series.gap_count, 1, "the 4h series carries the known Binance gap");
+    series.gap_count = 0;
+    series.gaps = [];
+  });
+  assert.equal(result.checks.files_intact, true, "the data file is untouched");
+  assert.equal(result.checks.bundle_sha256_consistent, true, "and the manifest resealed");
+  assert.equal(result.checks.controls_clean, true, "the edited booleans look clean");
+  assert.equal(result.checks.controls_recomputed, false, "recomputation catches it");
+  assert.equal(result.ok, false);
+});
+
+test("an inflated row count is refused because it is recomputed", () => {
+  const result = verifyTampered("exposure-rows-", (manifest) => {
+    manifest.series[0].rows += 1;
+  });
+  assert.equal(result.checks.controls_recomputed, false);
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.recomputed_control_mismatches[0].mismatches.map((item) => item.label),
+    ["rows"],
+  );
+});
+
+test("a falsified first or last bound is refused because it is recomputed", () => {
+  const result = verifyTampered("exposure-bounds-tamper-", (manifest) => {
+    manifest.series[0].first_open_time = "2021-01-01T00:00:00.000Z";
+  });
+  assert.equal(result.checks.controls_recomputed, false);
+  assert.equal(result.ok, false);
 });
 
 // --- Configuration bounds -----------------------------------------------------

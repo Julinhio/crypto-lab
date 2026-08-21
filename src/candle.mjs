@@ -59,6 +59,19 @@ export function candleProblems(candle) {
   if (candle.closeTime < candle.t) {
     problems.push(`closeTime ${candle.closeTime} precedes openTime ${candle.t}`);
   }
+  // Internal coherence. Finite and strictly positive is not enough: a high below
+  // the open, or a low above it, describes a candle that cannot have happened,
+  // and downstream range and volatility measures would be computed from it.
+  const body = { low: Math.min(candle.o, candle.c), high: Math.max(candle.o, candle.c) };
+  if (candle.h < body.high) {
+    problems.push(`h ${candle.h} is below the higher of open and close ${body.high}`);
+  }
+  if (candle.l > body.low) {
+    problems.push(`l ${candle.l} is above the lower of open and close ${body.low}`);
+  }
+  if (candle.l > candle.h) {
+    problems.push(`l ${candle.l} is above h ${candle.h}`);
+  }
   return problems;
 }
 

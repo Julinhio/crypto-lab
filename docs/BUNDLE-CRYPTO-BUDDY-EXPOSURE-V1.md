@@ -68,11 +68,14 @@ relit un bundle écrit. Une ligne est refusée si l'une de ces conditions manque
 - ouverture, haut, bas et clôture sont strictement positifs ;
 - volume, volume quote, nombre de transactions et volumes taker sont supérieurs
   ou égaux à zéro ;
-- `closeTime >= openTime`.
+- `closeTime >= openTime` ;
+- cohérence interne : `l <= min(o, c)` et `max(o, c) <= h`. Fini et strictement
+  positif ne suffit pas — un haut sous l'ouverture décrit une bougie qui n'a pas
+  pu exister, et les mesures de range et de volatilité en aval s'en nourriraient.
 
-Un volume nul reste accepté : une bougie sans échange est un fait, pas un
-défaut. À l'acquisition, une ligne invalide arrête le run ; à la vérification,
-elle est comptée et rapportée sous le label `invalid_rows`.
+Un volume nul reste accepté, et une bougie plate aussi : l'absence de mouvement
+est un fait, pas un défaut. À l'acquisition, une ligne invalide arrête le run ;
+à la vérification, elle est comptée et rapportée sous le label `invalid_rows`.
 
 ## Contrôle des doublons
 
@@ -130,7 +133,7 @@ SHA-256. Il ne porte pas sur `manifest.json`, qui le contient.
 node src/exposure-bundle.mjs verify --config config/crypto-buddy-exposure-v1.json --bundle data/bundles/crypto-buddy-exposure-v1
 ```
 
-Sortie `0` si tout passe, `2` sinon. Les neuf contrôles sont indépendants :
+Sortie `0` si tout passe, `2` sinon. Les dix contrôles sont indépendants :
 
 - `schema_version_supported` : `verify` est lui-même un consommateur du
   manifeste, il refuse une version de protocole qu'il ne sait pas lire ;
@@ -145,6 +148,8 @@ Sortie `0` si tout passe, `2` sinon. Les neuf contrôles sont indépendants :
   sans doublon ;
 - `metadata_matches_config` : `bundle_id`, `source` et les trois bornes du
   manifeste sont comparés champ par champ à la configuration ;
+- `series_reach_cutoff` : chaque série atteint le dernier créneau de son
+  timeframe avant `as_of_exclusive` ;
 - `controls_recomputed` : nombre de lignes, bornes, ordre et trous sont
   **recalculés depuis les fichiers de données** et confrontés à ce que le
   manifeste annonce ; la règle d'admissibilité est réappliquée à chaque bougie,
@@ -170,6 +175,13 @@ la cohérence de hash ne prouve que la cohérence interne, jamais l'exactitude.
   au-delà de la coupure. L'admissibilité est donc réappliquée ligne par ligne,
   contre les bornes de la configuration : un bundle ne peut pas déplacer sa
   propre coupure pour légitimer les lignes qu'il transporte.
+- Recalculer confirme que le manifeste décrit fidèlement le fichier qu'il
+  désigne, jamais que ce fichier va assez loin. Sans `series_reach_cutoff`,
+  amputer la fin d'une série puis réajuster compteurs, bornes et SHA certifie un
+  bundle auquel il manque des mois de fenêtre d'évaluation. La règle suppose que
+  chaque paire cote encore à la coupure, ce qui est vrai de cet univers ; une
+  paire délistée échouerait ici, et c'est délibéré — elle demanderait une raison
+  terminale déclarée, pas une série silencieusement plus courte.
 - `symbol` et `timeframe` font partie du preimage et le nom de fichier est
   vérifié contre eux. Sans cela, échanger deux symboles entre deux entrées du
   même timeframe passait tous les autres contrôles et faisait lire des bougies

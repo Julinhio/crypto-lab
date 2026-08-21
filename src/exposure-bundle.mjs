@@ -332,6 +332,24 @@ export function verifyExposureBundle({
     ...new Set(present.filter((key, index) => present.indexOf(key) !== index)),
   ];
 
+  // Recomputation confirms the manifest describes the file it points at; it
+  // never asks whether the file goes far enough. Without this, dropping the tail
+  // of a series, adjusting counts and endpoints and resealing certifies a bundle
+  // missing months of the evaluation window.
+  //
+  // The rule assumes every pair still trades at the cutoff, which is true of
+  // this universe. A delisted pair would fail here, and that is deliberate: it
+  // would need a declared terminal reason, not a silently shorter series.
+  const shortSeries = manifest.series
+    .map((item) => {
+      const step = timeframeMs(item.timeframe);
+      const expected = isoOrNull(
+        Math.floor((asOfExclusiveMs - step) / step) * step,
+      );
+      return { series: `${item.symbol}-${item.timeframe}`, expected, actual: item.last_open_time };
+    })
+    .filter((item) => item.actual !== item.expected);
+
   // The config hash proves the config file did not change. It says nothing
   // about whether the manifest still agrees with it, so the config-derived
   // fields are compared one by one.
@@ -374,6 +392,7 @@ export function verifyExposureBundle({
       && unexpectedSeries.length === 0
       && duplicatedSeries.length === 0,
     metadata_matches_config: metadataMismatches.length === 0,
+    series_reach_cutoff: shortSeries.length === 0,
     controls_recomputed: controlChecks.every((item) => item.ok),
   };
   return {
@@ -390,6 +409,7 @@ export function verifyExposureBundle({
     unexpected_series: unexpectedSeries,
     duplicated_series: duplicatedSeries,
     metadata_mismatches: metadataMismatches,
+    series_short_of_cutoff: shortSeries,
     recomputed_control_mismatches: controlChecks.filter((item) => !item.ok),
   };
 }

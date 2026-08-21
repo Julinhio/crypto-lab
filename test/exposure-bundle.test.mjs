@@ -203,7 +203,7 @@ test("two different payloads for one open time stop the run", async () => {
     ok: true,
     json: async () => [
       [FETCH_START, 1, 2, 1, 1, 9, FETCH_START + 4 * HOUR - 1, 9, 9, 9, 9],
-      [FETCH_START, 1, 2, 1, 7, 9, FETCH_START + 4 * HOUR - 1, 9, 9, 9, 9],
+      [FETCH_START, 1, 2, 1, 2, 9, FETCH_START + 4 * HOUR - 1, 9, 9, 9, 9],
     ],
   });
   await assert.rejects(
@@ -305,6 +305,36 @@ test("a close preceding its open is refused", () => {
 test("a non-integer timestamp is refused", () => {
   assert.throws(() => candleFromApiRow(apiRow({ 0: "1.5" })), /not a valid timestamp/);
   assert.throws(() => candleFromApiRow(apiRow({ 0: "-1" })), /not a valid timestamp/);
+});
+
+test("a high below the open or close is refused", () => {
+  assert.throws(
+    () => candleFromApiRow(apiRow({ 2: "104" })),
+    /h 104 is below the higher of open and close 105/,
+  );
+});
+
+test("a low above the open or close is refused", () => {
+  assert.throws(
+    () => candleFromApiRow(apiRow({ 3: "101" })),
+    /l 101 is above the lower of open and close 100/,
+  );
+});
+
+test("a low above the high is refused", () => {
+  // Finite, strictly positive, and impossible: exactly what the positivity
+  // rules alone let through.
+  const problems = candleProblems({
+    t: 0, o: 100, h: 50, l: 90, c: 100, v: 1,
+    closeTime: 1, qv: 1, trades: 1, takerBuyBase: 1, takerBuyQuote: 1,
+  });
+  assert.ok(problems.some((item) => /is below the higher of open and close/.test(item)));
+  assert.ok(problems.some((item) => /l 90 is above h 50/.test(item)));
+});
+
+test("a flat candle is accepted: no movement is a fact, not a defect", () => {
+  const candle = candleFromApiRow(apiRow({ 1: "100", 2: "100", 3: "100", 4: "100" }));
+  assert.deepEqual(candleProblems(candle), []);
 });
 
 test("a sound row passes and keeps the file schema", () => {
@@ -833,6 +863,40 @@ test("a resealed file carrying a zero price is refused", () => {
   });
   assert.equal(result.checks.controls_recomputed, false);
   assert.equal(result.ok, false);
+});
+
+// --- Completeness on the time axis --------------------------------------------
+
+test("a series truncated at the end is refused even fully resealed", () => {
+  const result = verifyTampered("exposure-tail-", (manifest, dir) => {
+    const series = manifest.series.find((item) => item.timeframe === "1d");
+    const filePath = path.join(dir, series.file);
+    const rows = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const kept = rows.slice(0, -100);
+    fs.writeFileSync(filePath, `${JSON.stringify(kept)}\n`, "utf8");
+    // Everything the manifest claims about the file is made true again.
+    series.sha256 = createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+    series.rows = kept.length;
+    series.last_open_time = new Date(kept.at(-1).t).toISOString();
+    series.last_close_time = new Date(kept.at(-1).closeTime).toISOString();
+  });
+  assert.equal(result.checks.files_intact, true, "the SHA matches the truncated file");
+  assert.equal(result.checks.controls_recomputed, true, "the manifest describes it faithfully");
+  assert.equal(result.checks.series_complete, true, "the series set is untouched");
+  assert.equal(result.checks.series_reach_cutoff, false, "reaching the cutoff is what catches it");
+  assert.equal(result.ok, false);
+  assert.equal(result.series_short_of_cutoff.length, 1);
+  assert.equal(result.series_short_of_cutoff[0].expected, "2026-08-20T00:00:00.000Z");
+});
+
+test("the shipped series all reach the last slot before the cutoff", () => {
+  const result = verifyExposureBundle({
+    bundleDir: BUNDLE_DIR,
+    repoRoot: process.cwd(),
+    configPath: "config/crypto-buddy-exposure-v1.json",
+  });
+  assert.equal(result.checks.series_reach_cutoff, true);
+  assert.deepEqual(result.series_short_of_cutoff, []);
 });
 
 // --- Manifest schema version --------------------------------------------------

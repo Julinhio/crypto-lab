@@ -205,9 +205,28 @@ export function verifyExposureBundle({
   );
   const currentProducerSha256 = producerSourceSha256(currentProducerFiles);
 
-  const configSha256 = configPath
-    ? sha256Buffer(fs.readFileSync(path.resolve(configPath)))
+  const config = configPath ? loadExposureConfig(configPath) : null;
+  const configSha256 = config ? config.configSha256 : null;
+
+  // Hash consistency alone cannot tell a complete bundle from a truncated one:
+  // drop a series and its file, recompute bundle_sha256 over what remains, and
+  // every other check still passes. The series set is therefore compared against
+  // the configured universe x timeframes.
+  const present = manifest.series.map((item) => `${item.symbol}-${item.timeframe}`);
+  const expected = config
+    ? config.universe
+      .flatMap((symbol) => config.timeframes.map((tf) => `${symbol}-${tf}`))
+      .sort()
     : null;
+  const missingSeries = expected
+    ? expected.filter((key) => !present.includes(key))
+    : [];
+  const unexpectedSeries = expected
+    ? present.filter((key) => !expected.includes(key))
+    : [];
+  const duplicatedSeries = [
+    ...new Set(present.filter((key, index) => present.indexOf(key) !== index)),
+  ];
 
   const checks = {
     files_intact: fileChecks.every((item) => item.ok),
@@ -219,15 +238,24 @@ export function verifyExposureBundle({
     controls_clean: manifest.series.every(
       (item) => item.duplicates_ok && item.strictly_ordered,
     ),
+    series_complete:
+      missingSeries.length === 0
+      && unexpectedSeries.length === 0
+      && duplicatedSeries.length === 0,
   };
   return {
     bundle_id: manifest.bundle_id,
     bundle_sha256: manifest.bundle_sha256,
     recomputed_bundle_sha256: recomputedBundleSha256,
     current_producer_source_sha256: currentProducerSha256,
+    series_expected: expected ? expected.length : null,
+    series_present: present.length,
     checks,
     ok: Object.values(checks).every(Boolean),
     mismatched_files: fileChecks.filter((item) => !item.ok),
+    missing_series: missingSeries,
+    unexpected_series: unexpectedSeries,
+    duplicated_series: duplicatedSeries,
   };
 }
 

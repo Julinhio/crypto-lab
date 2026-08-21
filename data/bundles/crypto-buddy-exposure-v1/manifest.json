@@ -7,7 +7,7 @@
   "evaluation_start": "2021-01-01T00:00:00.000Z",
   "as_of_exclusive": "2026-08-21T00:00:00.000Z",
   "acquisition_config_sha256": "0b025d7d332abbabc2dc84da2afeab1d3ae4b2f46c2ae23a8548261313825f7a",
-  "producer_source_sha256": "80c55f4c698f8a2931d69709bec20378ce0a8d23e4830d009a7c2c0fbc6c4b27",
+  "producer_source_sha256": "1a884e8a1b6cf9d95ee247bb3ef8019cf8acc4b25edb8810e1986e3597da9519",
   "producer_source_files": [
     {
       "path": "src/binance-source.mjs",
@@ -15,7 +15,7 @@
     },
     {
       "path": "src/exposure-bundle.mjs",
-      "sha256": "57fcabf752e17a6295e0a06c412a5121455df54e13e2375a858f2ae562f2577e"
+      "sha256": "8bed33ca11a9f0ccebd2ad81ae952c40219f3af0ade5ef0ed6389376f0426b0c"
     },
     {
       "path": "src/exposure-config.mjs",
@@ -38,7 +38,7 @@
       "sha256": "3cc0329b9f21a0399985e0f18178ff3b320e89456ef0ab369c47f57d8ae66052"
     }
   ],
-  "generation_git_commit": "5b09d665e6bfe01bf219fd84a504a9c9a31ee20d",
+  "generation_git_commit": "7bab7cb7771c1afac1245263f96cfdf7788ec531",
   "generation_git_commit_authority": "informative only, never a proof of provenance. The bundle is committed together with the manifest and the branch is squash-merged, so this commit does not exist at generation time and changes again on merge. Use producer_source_sha256.",
   "series": [
     {
@@ -202,5 +202,5 @@
       "sha256": "a8f020d4928b37f0feb5c5d6d3a02d4b541b3a5efbec36a3a4d5fa912ab88f45"
     }
   ],
-  "bundle_sha256": "7f00be577665c65f2670738081621a87e47daed9d7f070c1ad2cff989d28578f"
+  "bundle_sha256": "df810939eb9cb264108bee7c42e81126dd54aae73ba30a31da74db62d4d96ab1"
 }

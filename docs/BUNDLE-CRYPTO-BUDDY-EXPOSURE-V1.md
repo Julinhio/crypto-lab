@@ -104,14 +104,23 @@ SHA-256. Il ne porte pas sur `manifest.json`, qui le contient.
 node src/exposure-bundle.mjs verify --config config/crypto-buddy-exposure-v1.json --bundle data/bundles/crypto-buddy-exposure-v1
 ```
 
-Sortie `0` si tout passe, `2` sinon. Les cinq contrôles sont indépendants :
+Sortie `0` si tout passe, `2` sinon. Les six contrôles sont indépendants :
 
 - `files_intact` : les huit fichiers ont le SHA-256 annoncé ;
 - `bundle_sha256_consistent` : le manifeste est cohérent avec lui-même ;
 - `producer_source_unchanged` : les sources d'acquisition actuelles hashent
   toujours à la valeur enregistrée ;
 - `acquisition_config_unchanged` : la configuration n'a pas bougé ;
-- `controls_clean` : ni doublon, ni rupture d'ordre.
+- `controls_clean` : ni doublon, ni rupture d'ordre ;
+- `series_complete` : l'ensemble des séries du manifeste correspond exactement à
+  `universe × timeframes` de la configuration, sans manquante, sans intruse,
+  sans doublon.
+
+Le dernier contrôle n'est pas redondant avec les hashes. Retirer une série et
+son fichier, puis recalculer `bundle_sha256` sur ce qui reste, produit un
+manifeste parfaitement cohérent avec lui-même : la cohérence de hash seule ne
+distingue pas un bundle complet d'un bundle tronqué. Seule la comparaison à la
+configuration le fait. Un test reproduit exactement ce scénario.
 
 Aucun accès réseau, aucune dépendance vivante vers `crypto-buddy`.
 

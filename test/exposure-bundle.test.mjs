@@ -19,7 +19,12 @@ import {
   preflight,
 } from "../src/binance-source.mjs";
 import { downloadKlines, inspectSeries } from "../src/klines.mjs";
-import { bundlePreimage, buildExposureBundle, computeBundleSha256 } from "../src/exposure-bundle.mjs";
+import {
+  bundlePreimage,
+  buildExposureBundle,
+  computeBundleSha256,
+  verifyExposureBundle,
+} from "../src/exposure-bundle.mjs";
 import { loadExposureConfig } from "../src/exposure-config.mjs";
 
 const AS_OF = Date.parse("2026-08-21T00:00:00.000Z");
@@ -372,6 +377,98 @@ test("the bundle hash is stable across repeated computation", () => {
   const second = computeBundleSha256(bundlePreimage(PREIMAGE_INPUT));
   assert.equal(first, second);
   assert.match(first, /^[0-9a-f]{64}$/);
+});
+
+// --- Completeness of a verified bundle ----------------------------------------
+
+const BUNDLE_DIR = "data/bundles/crypto-buddy-exposure-v1";
+
+function copyBundle(prefix) {
+  const target = temporaryDir(prefix);
+  fs.cpSync(BUNDLE_DIR, target, { recursive: true });
+  return target;
+}
+
+test("the shipped bundle verifies clean", () => {
+  const result = verifyExposureBundle({
+    bundleDir: BUNDLE_DIR,
+    repoRoot: process.cwd(),
+    configPath: "config/crypto-buddy-exposure-v1.json",
+  });
+  assert.equal(result.ok, true, JSON.stringify(result.checks));
+  assert.equal(result.series_present, 8);
+  assert.equal(result.series_expected, 8);
+});
+
+test("a truncated bundle is refused even once its hashes are made consistent", () => {
+  const dir = copyBundle("exposure-truncated-");
+  const manifestPath = path.join(dir, "manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+
+  const dropped = manifest.series.pop();
+  fs.rmSync(path.join(dir, dropped.file));
+  // Re-seal the manifest over what remains: hash consistency alone must not be
+  // enough to certify an incomplete bundle.
+  manifest.bundle_sha256 = computeBundleSha256(bundlePreimage({
+    bundleId: manifest.bundle_id,
+    fetchStart: manifest.fetch_start,
+    evaluationStart: manifest.evaluation_start,
+    asOfExclusive: manifest.as_of_exclusive,
+    producerSourceSha256: manifest.producer_source_sha256,
+    acquisitionConfigSha256: manifest.acquisition_config_sha256,
+    files: manifest.series,
+  }));
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+  const result = verifyExposureBundle({
+    bundleDir: dir,
+    repoRoot: process.cwd(),
+    configPath: "config/crypto-buddy-exposure-v1.json",
+  });
+  assert.equal(result.checks.bundle_sha256_consistent, true, "the forgery is self-consistent");
+  assert.equal(result.checks.files_intact, true);
+  assert.equal(result.checks.acquisition_config_unchanged, true);
+  assert.equal(result.checks.series_complete, false, "completeness is what catches it");
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.missing_series, [`${dropped.symbol}-${dropped.timeframe}`]);
+  assert.equal(result.series_present, 7);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("a bundle carrying a series outside the configuration is refused", () => {
+  const dir = copyBundle("exposure-extra-");
+  const manifestPath = path.join(dir, "manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  manifest.series[0] = { ...manifest.series[0], symbol: "SOLUSDT" };
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+  const result = verifyExposureBundle({
+    bundleDir: dir,
+    repoRoot: process.cwd(),
+    configPath: "config/crypto-buddy-exposure-v1.json",
+  });
+  assert.equal(result.checks.series_complete, false);
+  assert.equal(result.ok, false);
+  assert.ok(result.unexpected_series.includes(`SOLUSDT-${manifest.series[0].timeframe}`));
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("a bundle listing the same series twice is refused", () => {
+  const dir = copyBundle("exposure-dup-");
+  const manifestPath = path.join(dir, "manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  manifest.series.push({ ...manifest.series[0] });
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+  const result = verifyExposureBundle({
+    bundleDir: dir,
+    repoRoot: process.cwd(),
+    configPath: "config/crypto-buddy-exposure-v1.json",
+  });
+  assert.equal(result.checks.series_complete, false);
+  assert.equal(result.ok, false);
+  assert.equal(result.duplicated_series.length, 1);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 // --- Configuration bounds -----------------------------------------------------

@@ -13,7 +13,7 @@ import {
 } from "./lib.mjs";
 import { BINANCE_DATA_API, preflight } from "./binance-source.mjs";
 import { downloadKlines, inspectSeries } from "./klines.mjs";
-import { timeframeMs } from "./timeframe.mjs";
+import { isAdmissibleCandle, timeframeMs } from "./timeframe.mjs";
 import { loadExposureConfig } from "./exposure-config.mjs";
 import { collectProducerSources, producerSourceSha256 } from "./producer-source.mjs";
 
@@ -58,6 +58,8 @@ export function bundlePreimage({
     files: [...files]
       .map((item) => ({
         file: item.file,
+        symbol: item.symbol,
+        timeframe: item.timeframe,
         sha256: item.sha256,
         duplicate_open_times_returned_by_source:
           item.duplicate_open_times_returned_by_source,
@@ -192,6 +194,15 @@ export function verifyExposureBundle({
 }) {
   const manifestPath = path.resolve(bundleDir, "manifest.json");
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const config = configPath ? loadExposureConfig(configPath) : null;
+  // Admissibility is re-judged against the configuration when there is one, so
+  // that a bundle cannot move its own cutoff to legitimise the rows it carries.
+  const fetchStartMs = config
+    ? config.fetchStartMs
+    : Date.parse(manifest.fetch_start);
+  const asOfExclusiveMs = config
+    ? config.asOfExclusiveMs
+    : Date.parse(manifest.as_of_exclusive);
 
   const fileChecks = manifest.series.map((item) => {
     const filePath = path.resolve(bundleDir, item.file);
@@ -215,6 +226,34 @@ export function verifyExposureBundle({
     const rows = JSON.parse(fs.readFileSync(filePath, "utf8"));
     const recomputed = inspectSeries(rows, timeframeMs(item.timeframe));
     const mismatches = [];
+    // The admissibility rule is the bundle's defining discipline. Re-apply it
+    // row by row: recomputing counts and endpoints would not notice a candle
+    // closing at or after the cutoff, which is exactly look-ahead leakage.
+    const inadmissible = rows.filter((row) => !isAdmissibleCandle(
+      { openTime: row.t, closeTime: row.closeTime },
+      fetchStartMs,
+      asOfExclusiveMs,
+    ));
+    if (inadmissible.length) {
+      mismatches.push({
+        label: "inadmissible_rows",
+        expected: 0,
+        actual: inadmissible.length,
+        firstOpenTime: isoOrNull(inadmissible[0].t),
+        firstCloseTime: isoOrNull(inadmissible[0].closeTime),
+      });
+    }
+    // The file name is part of the series identity. Without this, swapping two
+    // symbols between entries of the same timeframe passes every other check
+    // and silently relabels one asset as another.
+    const expectedFile = `raw/${item.symbol}-${item.timeframe}.json`;
+    if (item.file !== expectedFile) {
+      mismatches.push({
+        label: "file_name_matches_identity",
+        expected: expectedFile,
+        actual: item.file,
+      });
+    }
     const compare = (label, expected, actual) => {
       if (expected !== actual) mismatches.push({ label, expected, actual });
     };
@@ -252,7 +291,6 @@ export function verifyExposureBundle({
   );
   const currentProducerSha256 = producerSourceSha256(currentProducerFiles);
 
-  const config = configPath ? loadExposureConfig(configPath) : null;
   const configSha256 = config ? config.configSha256 : null;
 
   // Hash consistency alone cannot tell a complete bundle from a truncated one:
@@ -301,8 +339,13 @@ export function verifyExposureBundle({
       currentProducerSha256 === manifest.producer_source_sha256,
     acquisition_config_unchanged:
       configSha256 === null || configSha256 === manifest.acquisition_config_sha256,
+    // Derived from the authenticated count, not from the `duplicates_ok`
+    // boolean: that boolean is not in the preimage, so it can be left true
+    // while the count it summarises is resealed to a non-zero value.
     controls_clean: manifest.series.every(
-      (item) => item.duplicates_ok && item.strictly_ordered,
+      (item) => item.duplicate_open_times_returned_by_source === 0
+        && item.duplicates_ok === (item.duplicate_open_times_returned_by_source === 0)
+        && item.strictly_ordered,
     ),
     series_complete:
       missingSeries.length === 0

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { DAY, HOUR } from "../src/lib.mjs";
@@ -326,12 +327,16 @@ const PREIMAGE_INPUT = {
   files: [
     {
       file: "raw/BTCUSDT-4h.json",
+      symbol: "BTCUSDT",
+      timeframe: "4h",
       sha256: "c".repeat(64),
       duplicate_open_times_returned_by_source: 0,
       discarded_by_admissibility: 0,
     },
     {
       file: "raw/ETHUSDT-1d.json",
+      symbol: "ETHUSDT",
+      timeframe: "1d",
       sha256: "d".repeat(64),
       duplicate_open_times_returned_by_source: 0,
       discarded_by_admissibility: 0,
@@ -365,6 +370,8 @@ test("the bundle hash ignores fields the manifest carries but the preimage does 
     "duplicate_open_times_returned_by_source",
     "file",
     "sha256",
+    "symbol",
+    "timeframe",
   ]);
 });
 
@@ -386,6 +393,8 @@ test("the bundle hash moves when any covered field moves", () => {
       }],
     },
     { files: [{ ...PREIMAGE_INPUT.files[0], discarded_by_admissibility: 7 }] },
+    { files: [{ ...PREIMAGE_INPUT.files[0], symbol: "ETHUSDT" }] },
+    { files: [{ ...PREIMAGE_INPUT.files[0], timeframe: "1d" }] },
   ];
   for (const mutation of mutations) {
     assert.notEqual(
@@ -581,6 +590,84 @@ test("an inflated row count is refused because it is recomputed", () => {
     result.recomputed_control_mismatches[0].mismatches.map((item) => item.label),
     ["rows"],
   );
+});
+
+test("swapping two symbols between entries of the same timeframe is refused", () => {
+  const result = verifyTampered("exposure-swap-", (manifest) => {
+    const first = manifest.series.find((item) => item.symbol === "BTCUSDT" && item.timeframe === "4h");
+    const second = manifest.series.find((item) => item.symbol === "ETHUSDT" && item.timeframe === "4h");
+    first.symbol = "ETHUSDT";
+    second.symbol = "BTCUSDT";
+  });
+  assert.equal(result.checks.files_intact, true, "both files are untouched");
+  assert.equal(result.checks.series_complete, true, "the symbol set is unchanged");
+  assert.equal(result.checks.metadata_matches_config, true, "and so is every bound");
+  assert.equal(
+    result.checks.controls_recomputed,
+    false,
+    "the file name no longer matches the identity it is filed under",
+  );
+  assert.equal(result.ok, false);
+  const labels = result.recomputed_control_mismatches
+    .flatMap((item) => item.mismatches.map((m) => m.label));
+  assert.ok(labels.includes("file_name_matches_identity"), JSON.stringify(labels));
+});
+
+test("swapping two symbols without resealing also breaks the bundle hash", () => {
+  const result = verifyTampered(
+    "exposure-swap-unsealed-",
+    (manifest) => {
+      const first = manifest.series.find((item) => item.symbol === "BTCUSDT" && item.timeframe === "4h");
+      const second = manifest.series.find((item) => item.symbol === "ETHUSDT" && item.timeframe === "4h");
+      first.symbol = "ETHUSDT";
+      second.symbol = "BTCUSDT";
+    },
+    { resealManifest: false },
+  );
+  assert.equal(
+    result.checks.bundle_sha256_consistent,
+    false,
+    "symbol is part of the authenticated preimage",
+  );
+  assert.equal(result.ok, false);
+});
+
+test("a resealed file carrying a candle past the cutoff is refused", () => {
+  const result = verifyTampered("exposure-lookahead-", (manifest, dir) => {
+    const series = manifest.series[0];
+    const filePath = path.join(dir, series.file);
+    const rows = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const last = rows.at(-1);
+    // A candle opening before the cutoff but closing at it: exactly the
+    // look-ahead the third admissibility condition exists to keep out.
+    rows.push({
+      ...last,
+      t: AS_OF - HOUR,
+      closeTime: AS_OF + HOUR,
+    });
+    fs.writeFileSync(filePath, `${JSON.stringify(rows)}\n`, "utf8");
+    series.sha256 = createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+    series.rows = rows.length;
+    series.last_open_time = new Date(AS_OF - HOUR).toISOString();
+    series.last_close_time = new Date(AS_OF + HOUR).toISOString();
+  });
+  assert.equal(result.checks.files_intact, true, "the SHA was updated to match");
+  assert.equal(result.checks.bundle_sha256_consistent, true, "and the manifest resealed");
+  assert.equal(result.checks.controls_recomputed, false);
+  assert.equal(result.ok, false);
+  const labels = result.recomputed_control_mismatches[0].mismatches.map((item) => item.label);
+  assert.ok(labels.includes("inadmissible_rows"), JSON.stringify(labels));
+});
+
+test("a resealed non-zero duplicate count cannot hide behind duplicates_ok", () => {
+  const result = verifyTampered("exposure-dupflag-", (manifest) => {
+    manifest.series[0].duplicate_open_times_returned_by_source = 1;
+    // duplicates_ok deliberately left true: the boolean must not be believed.
+  });
+  assert.equal(result.checks.bundle_sha256_consistent, true, "the count is authenticated");
+  assert.equal(result.checks.controls_recomputed, true, "the file itself is clean");
+  assert.equal(result.checks.controls_clean, false, "the count is what decides");
+  assert.equal(result.ok, false);
 });
 
 test("a falsified first or last bound is refused because it is recomputed", () => {

@@ -119,7 +119,9 @@ Sortie `0` si tout passe, `2` sinon. Les huit contrôles sont indépendants :
   manifeste sont comparés champ par champ à la configuration ;
 - `controls_recomputed` : nombre de lignes, bornes, ordre et trous sont
   **recalculés depuis les fichiers de données** et confrontés à ce que le
-  manifeste annonce.
+  manifeste annonce ; la règle d'admissibilité est réappliquée à chaque bougie,
+  et le nom de fichier doit correspondre au couple `symbol`/`timeframe` sous
+  lequel la série est classée.
 
 Les trois derniers contrôles ne sont pas redondants avec les hashes, parce que
 la cohérence de hash ne prouve que la cohérence interne, jamais l'exactitude.
@@ -134,9 +136,19 @@ la cohérence de hash ne prouve que la cohérence interne, jamais l'exactitude.
   ou une autre identité, et `source` peut même être modifié sans re-sceller
   quoi que ce soit.
 - Une valeur comme `strictly_ordered` ou `gap_count` est une affirmation sur la
-  donnée : elle est recalculée, jamais crue sur parole.
+  donnée : elle est recalculée, jamais crue sur parole. `duplicates_ok` est
+  dérivé du compteur authentifié, pas lu comme booléen.
+- Recalculer des compteurs et des bornes ne remarquerait pas une bougie clôturant
+  au-delà de la coupure. L'admissibilité est donc réappliquée ligne par ligne,
+  contre les bornes de la configuration : un bundle ne peut pas déplacer sa
+  propre coupure pour légitimer les lignes qu'il transporte.
+- `symbol` et `timeframe` font partie du preimage et le nom de fichier est
+  vérifié contre eux. Sans cela, échanger deux symboles entre deux entrées du
+  même timeframe passait tous les autres contrôles et faisait lire des bougies
+  BTC comme de l'ETH.
 
-Chacun de ces scénarios de forge est reproduit tel quel par un test.
+Chacun de ces scénarios de forge est reproduit tel quel par un test, re-scellage
+du manifeste compris.
 
 Aucun accès réseau, aucune dépendance vivante vers `crypto-buddy`.
 

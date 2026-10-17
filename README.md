@@ -136,5 +136,12 @@ d'exposition ailleurs que sur un seul mois haussier. Le contrat de consommation,
 les preuves de provenance et le trou Binance du 19 février 2020 sont documentés
 dans `docs/BUNDLE-CRYPTO-BUDDY-EXPOSURE-V1.md`.
 
+`data/bundles/crypto-buddy-exposure-v2-core/` et `data/bundles/crypto-buddy-exposure-v2-sol/`
+forment le bundle v2 de **calibration seule** : uniquement les bougies ouvertes avant le
+`2024-07-01`, SOL compris. La partie de validation est scellée hors de tout dépôt ; seule
+son empreinte est commitée, dans
+`data/bundles/crypto-buddy-exposure-v2-validation.fingerprint.json`. Voir
+`docs/BUNDLE-CRYPTO-BUDDY-EXPOSURE-V2.md`.
+
 Aucune logique de régime, de transition ou de porte ne vit dans ce dépôt : elle
 reste dans `crypto-buddy`.

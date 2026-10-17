@@ -1,0 +1,210 @@
+{
+  "schema_version": 1,
+  "bundle_id": "crypto-buddy-exposure-v2-core",
+  "source": "https://data-api.binance.vision",
+  "producer_repository": "github.com/Julinhio/crypto-lab",
+  "fetch_start": "2020-01-01T00:00:00.000Z",
+  "evaluation_start": "2021-01-01T00:00:00.000Z",
+  "as_of_exclusive": "2024-07-01T00:00:00.000Z",
+  "acquisition_config_sha256": "9d6c9e1493b6a51ec6c95385f0a936bac3fe6cb0e7a8b6ae1bb5560c557013e0",
+  "producer_source_sha256": "b517acc2aa4f088199cd04612e68b9a9d8b22e5313990d441fb85bda3eba7e84",
+  "producer_source_files": [
+    {
+      "path": "src/binance-source.mjs",
+      "sha256": "f5db4082ba2823292529766e81c7308b03542455329f8cd1240e108dfac58667"
+    },
+    {
+      "path": "src/candle.mjs",
+      "sha256": "b6e78ba310c318644fa8ee54c5c927ec6e273012c044e9986378766ac993a298"
+    },
+    {
+      "path": "src/exposure-bundle.mjs",
+      "sha256": "1edc385dfddce79732965c96c68bb48e9b267bcbe8f7d20ea13cde70aa6cd18a"
+    },
+    {
+      "path": "src/exposure-config.mjs",
+      "sha256": "f353d4d7df0ac525eb205cdee2b534fa5becfd8ed3f696240e9bb1ca5cd18803"
+    },
+    {
+      "path": "src/klines.mjs",
+      "sha256": "5135926bd3a2091be4166a48dd063ee407e34e46694a7485dcf72fefe3b096d4"
+    },
+    {
+      "path": "src/lib.mjs",
+      "sha256": "63d2c0037b42c7058e0661363f213b16975074235945845c114d00a2107b8d56"
+    },
+    {
+      "path": "src/producer-source.mjs",
+      "sha256": "0d77f877ca5e7c69f23f486db5c357e50f6b698cb65a795cd1242018d0686b98"
+    },
+    {
+      "path": "src/timeframe.mjs",
+      "sha256": "69a16a7484ce5c05fb43e38b1532e78f6431b3baa153282e0db0b7da73b4c1a9"
+    }
+  ],
+  "generation_git_commit": "ed9bc04a7f150132cd197abff42fec1c6c78f89a",
+  "generation_git_commit_authority": "informative only, never a proof of provenance. The bundle is committed together with the manifest and the branch is squash-merged, so this commit does not exist at generation time and changes again on merge. Use producer_source_sha256.",
+  "series": [
+    {
+      "symbol": "BNBUSDT",
+      "timeframe": "1d",
+      "file": "raw/BNBUSDT-1d.json",
+      "rows": 1643,
+      "first_open_time": "2020-01-01T00:00:00.000Z",
+      "first_close_time": "2020-01-01T23:59:59.999Z",
+      "last_open_time": "2024-06-30T00:00:00.000Z",
+      "last_close_time": "2024-06-30T23:59:59.999Z",
+      "duplicate_open_times_returned_by_source": 0,
+      "duplicates_ok": true,
+      "strictly_ordered": true,
+      "gap_count": 0,
+      "gaps": [],
+      "discarded_by_admissibility": 0,
+      "sha256": "cba2c66b96d3411cb976df403317f1ee47e54c52d14c7f9beb22decc58265ee8"
+    },
+    {
+      "symbol": "BNBUSDT",
+      "timeframe": "4h",
+      "file": "raw/BNBUSDT-4h.json",
+      "rows": 9857,
+      "first_open_time": "2020-01-01T00:00:00.000Z",
+      "first_close_time": "2020-01-01T03:59:59.999Z",
+      "last_open_time": "2024-06-30T20:00:00.000Z",
+      "last_close_time": "2024-06-30T23:59:59.999Z",
+      "duplicate_open_times_returned_by_source": 0,
+      "duplicates_ok": true,
+      "strictly_ordered": true,
+      "gap_count": 1,
+      "gaps": [
+        {
+          "afterOpenTime": "2020-02-19T08:00:00.000Z",
+          "beforeOpenTime": "2020-02-19T16:00:00.000Z",
+          "missingBars": 1
+        }
+      ],
+      "discarded_by_admissibility": 0,
+      "sha256": "43b730248fcc8bcdacc39b6ae906804b251539b9296e88164291b0d863af6e31"
+    },
+    {
+      "symbol": "BTCUSDT",
+      "timeframe": "1d",
+      "file": "raw/BTCUSDT-1d.json",
+      "rows": 1643,
+      "first_open_time": "2020-01-01T00:00:00.000Z",
+      "first_close_time": "2020-01-01T23:59:59.999Z",
+      "last_open_time": "2024-06-30T00:00:00.000Z",
+      "last_close_time": "2024-06-30T23:59:59.999Z",
+      "duplicate_open_times_returned_by_source": 0,
+      "duplicates_ok": true,
+      "strictly_ordered": true,
+      "gap_count": 0,
+      "gaps": [],
+      "discarded_by_admissibility": 0,
+      "sha256": "c18d30cf47a0405c5f54a921e26e14dff066885bda22674784db3f6d431d5323"
+    },
+    {
+      "symbol": "BTCUSDT",
+      "timeframe": "4h",
+      "file": "raw/BTCUSDT-4h.json",
+      "rows": 9857,
+      "first_open_time": "2020-01-01T00:00:00.000Z",
+      "first_close_time": "2020-01-01T03:59:59.999Z",
+      "last_open_time": "2024-06-30T20:00:00.000Z",
+      "last_close_time": "2024-06-30T23:59:59.999Z",
+      "duplicate_open_times_returned_by_source": 0,
+      "duplicates_ok": true,
+      "strictly_ordered": true,
+      "gap_count": 1,
+      "gaps": [
+        {
+          "afterOpenTime": "2020-02-19T08:00:00.000Z",
+          "beforeOpenTime": "2020-02-19T16:00:00.000Z",
+          "missingBars": 1
+        }
+      ],
+      "discarded_by_admissibility": 0,
+      "sha256": "d7e528922a68cd6bbdb97399ef6500c35742b4e373474e9ef2bebc801dec835f"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "timeframe": "1d",
+      "file": "raw/ETHUSDT-1d.json",
+      "rows": 1643,
+      "first_open_time": "2020-01-01T00:00:00.000Z",
+      "first_close_time": "2020-01-01T23:59:59.999Z",
+      "last_open_time": "2024-06-30T00:00:00.000Z",
+      "last_close_time": "2024-06-30T23:59:59.999Z",
+      "duplicate_open_times_returned_by_source": 0,
+      "duplicates_ok": true,
+      "strictly_ordered": true,
+      "gap_count": 0,
+      "gaps": [],
+      "discarded_by_admissibility": 0,
+      "sha256": "d922eaca0e8d50286e6cc544f68864c9ecef572319eb17d6281274187e197328"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "timeframe": "4h",
+      "file": "raw/ETHUSDT-4h.json",
+      "rows": 9857,
+      "first_open_time": "2020-01-01T00:00:00.000Z",
+      "first_close_time": "2020-01-01T03:59:59.999Z",
+      "last_open_time": "2024-06-30T20:00:00.000Z",
+      "last_close_time": "2024-06-30T23:59:59.999Z",
+      "duplicate_open_times_returned_by_source": 0,
+      "duplicates_ok": true,
+      "strictly_ordered": true,
+      "gap_count": 1,
+      "gaps": [
+        {
+          "afterOpenTime": "2020-02-19T08:00:00.000Z",
+          "beforeOpenTime": "2020-02-19T16:00:00.000Z",
+          "missingBars": 1
+        }
+      ],
+      "discarded_by_admissibility": 0,
+      "sha256": "8c684a28261fcf922fec86837f9d3136b282c38c7240641e5b5003469fc4e4e7"
+    },
+    {
+      "symbol": "XRPUSDT",
+      "timeframe": "1d",
+      "file": "raw/XRPUSDT-1d.json",
+      "rows": 1643,
+      "first_open_time": "2020-01-01T00:00:00.000Z",
+      "first_close_time": "2020-01-01T23:59:59.999Z",
+      "last_open_time": "2024-06-30T00:00:00.000Z",
+      "last_close_time": "2024-06-30T23:59:59.999Z",
+      "duplicate_open_times_returned_by_source": 0,
+      "duplicates_ok": true,
+      "strictly_ordered": true,
+      "gap_count": 0,
+      "gaps": [],
+      "discarded_by_admissibility": 0,
+      "sha256": "b63ca19770846920bf093d0fee63282b4274d8930db6e8264379abc398c6c297"
+    },
+    {
+      "symbol": "XRPUSDT",
+      "timeframe": "4h",
+      "file": "raw/XRPUSDT-4h.json",
+      "rows": 9857,
+      "first_open_time": "2020-01-01T00:00:00.000Z",
+      "first_close_time": "2020-01-01T03:59:59.999Z",
+      "last_open_time": "2024-06-30T20:00:00.000Z",
+      "last_close_time": "2024-06-30T23:59:59.999Z",
+      "duplicate_open_times_returned_by_source": 0,
+      "duplicates_ok": true,
+      "strictly_ordered": true,
+      "gap_count": 1,
+      "gaps": [
+        {
+          "afterOpenTime": "2020-02-19T08:00:00.000Z",
+          "beforeOpenTime": "2020-02-19T16:00:00.000Z",
+          "missingBars": 1
+        }
+      ],
+      "discarded_by_admissibility": 0,
+      "sha256": "7ae9c9fb198a7d16b4395ae452610b3430640758cf03b45aacc8d77bb4628d32"
+    }
+  ],
+  "bundle_sha256": "1ec86eba76046eca8fc27906d2f7e513a3b3cbce5fcde32facd9d1e258cb6ad2"
+}

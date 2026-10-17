@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "bundleId": "crypto-buddy-exposure-v2-validation",
+  "source": "https://data-api.binance.vision",
+  "universe": ["BTCUSDT", "ETHUSDT", "BNBUSDT", "XRPUSDT", "SOLUSDT"],
+  "timeframes": ["4h", "1d"],
+  "fetchStartInclusive": "2024-06-30T20:00:00.000Z",
+  "evaluationStartInclusive": "2024-07-01T00:00:00.000Z",
+  "asOfExclusive": "2026-06-01T00:00:00.000Z"
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "bundleId": "crypto-buddy-exposure-v2-sol",
+  "source": "https://data-api.binance.vision",
+  "universe": ["SOLUSDT"],
+  "timeframes": ["4h", "1d"],
+  "fetchStartInclusive": "2020-08-11T04:00:00.000Z",
+  "evaluationStartInclusive": "2021-01-01T00:00:00.000Z",
+  "asOfExclusive": "2024-07-01T00:00:00.000Z"
+}

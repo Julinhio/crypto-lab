@@ -138,10 +138,11 @@ dans `docs/BUNDLE-CRYPTO-BUDDY-EXPOSURE-V1.md`.
 
 `data/bundles/crypto-buddy-exposure-v2-core/` et `data/bundles/crypto-buddy-exposure-v2-sol/`
 forment le bundle v2 de **calibration seule** : uniquement les bougies ouvertes avant le
-`2024-07-01`, SOL compris. La partie de validation est scellée hors de tout dépôt ; seule
+`2024-07-01`, SOL compris. La partie de validation est écrite hors de tout dépôt ; seule
 son empreinte est commitée, dans
 `data/bundles/crypto-buddy-exposure-v2-validation.fingerprint.json`. Voir
-`docs/BUNDLE-CRYPTO-BUDDY-EXPOSURE-V2.md`.
+`docs/BUNDLE-CRYPTO-BUDDY-EXPOSURE-V2.md`, y compris ce que ce sceau ne garantit pas :
+la fenêtre est non mesurée, pas jamais vue (le v1 ci-dessus la contient).
 
 Aucune logique de régime, de transition ou de porte ne vit dans ce dépôt : elle
 reste dans `crypto-buddy`.

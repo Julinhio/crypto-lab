@@ -43,6 +43,27 @@ Son `fetch_start` est la dernière barre 4h de calibration (`2024-06-30T20:00`).
 chevauchement d'une barre est voulu : il sert au test de préfixe du banc à l'ouverture.
 Cette barre est une donnée de calibration, déjà présente dans le cœur.
 
+### Ce que le sceau garantit, et ce qu'il ne garantit pas
+
+**Il garantit l'absence de mesure et de réglage sur `[2024-07-01, 2026-06-01)`** : aucun
+chemin de calibration ni de mesure du banc v1.3 ne lit ces bougies, et le chargeur de
+calibration de `crypto-buddy` refuse tout bundle qui en contient une. C'est une garantie de
+procédure, prouvée par le code et par les tests.
+
+**Il ne garantit pas l'ignorance du marché.** Les expositions connues, sans les minimiser :
+
+- ces bougies sont des données publiques de Binance ;
+- le bundle `crypto-buddy-exposure-v1` les contient (BTC, ETH, BNB, XRP jusqu'au
+  2026-08-20). Il reste dans l'arbre et l'historique de ce dépôt, et dans l'historique de
+  `crypto-buddy` ;
+- la PR #36 de `crypto-buddy` (21/08/2026) a calculé des indicateurs de régime sur toute la
+  durée de ce bundle, fenêtre scellée comprise. Aucun résultat de stratégie n'a été calculé
+  ni publié sur cette fenêtre : l'ouverture hors-échantillon de cette PR n'a jamais eu lieu ;
+- l'évolution générale du marché sur 2024-2026 est connue de toute l'équipe.
+
+La fenêtre est donc « non mesurée », pas « jamais vue ». Le seul hors-échantillon
+réellement inédit reste le futur.
+
 ## Vérification
 
 ```bash
